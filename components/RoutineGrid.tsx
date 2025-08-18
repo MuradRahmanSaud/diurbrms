@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { DailyRoutineData, FullRoutineData, ClassDetail, RoomEntry, DayOfWeek, RoutineViewMode, DefaultTimeSlot, ScheduleOverrides, SemesterCloneInfo, ProgramEntry, EnrollmentEntry, TimeSlot, AttendanceLogEntry, ConflictInfoForModal, PendingChange, User } from '../types';
 import { DAYS_OF_WEEK } from '../data/routineConstants';
@@ -279,6 +277,7 @@ interface RoutineGridProps {
   selectedCourseSectionIdsFilter: string[];
   onLogAttendance: (logData: Omit<AttendanceLogEntry, 'id' | 'timestamp' | 'status' | 'makeupInfo'>) => void;
   onOpenConflictModal: (conflictInfo: ConflictInfoForModal) => void;
+  isEditable: boolean;
 }
 
 const getDayOfWeekFromISO = (isoDate: string): DayOfWeek | null => {
@@ -361,6 +360,7 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
     onLogAttendance,
     onOpenConflictModal,
     pendingChanges,
+    isEditable,
   } = props;
 
   const [hoveredRowKey, setHoveredRowKey] = useState<string | null>(null); 
@@ -513,8 +513,8 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
         e.preventDefault();
         setDragOverCellKey(null);
 
-        if (isInactive) {
-            return; // Can't drop on inactive slots.
+        if (!isEditable || isInactive) {
+            return; // Can't drop on inactive slots or in read-only mode.
         }
 
         try {
@@ -672,8 +672,8 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
                 }
             }
             
-            const isDraggable = !!finalClassInfo && !isMakeupClass && (user?.dashboardAccess?.canDragAndDrop === true);
-            const isDropTarget = !isInactiveSlot && !pendingChangeForThisCell;
+            const isDraggable = isEditable && !!finalClassInfo && !isMakeupClass && (user?.dashboardAccess?.canDragAndDrop === true);
+            const isDropTarget = isEditable && !isInactiveSlot && !pendingChangeForThisCell;
             const isCellClickable = !isInactiveSlot;
             
             const cellKeyForConflictCheck = `${selectedDayForRoomCentricView}-${room.roomNumber}-${programSlotString}`;
@@ -724,7 +724,7 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
             if (!hasLogPermission) {
                 logTooltip = "You do not have permission to log attendance.";
             } else if (!selectedDate) {
-                logTooltip = "Select a specific date from the header to log attendance.";
+                logTooltip = `Select a specific date from the header to log attendance.`;
             } else if (finalClassInfo) {
                 logTooltip = `Log attendance for ${finalClassInfo.courseCode} on ${selectedDate}`;
             }
@@ -777,8 +777,8 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
                   setHoveredColumnKey(null);
                   setHoveredCellKey(null);
                 }}
-                onDragOver={(e) => { if(isDropTarget) e.preventDefault(); }}
-                onDragEnter={(e) => { if(isDropTarget) { e.preventDefault(); setDragOverCellKey(currentCellKey); } }}
+                onDragOver={(e) => { if (isEditable && isDropTarget) e.preventDefault(); }}
+                onDragEnter={(e) => { if (isEditable && isDropTarget) { e.preventDefault(); setDragOverCellKey(currentCellKey); } }}
                 onDragLeave={() => setDragOverCellKey(null)}
                 onDrop={(e) => handleDrop(e, room, headerSlotObj, isInactiveSlot)}
               >

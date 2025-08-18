@@ -29,6 +29,7 @@ const SEED_USERS: (User & { password_plaintext: string })[] = [
       canManageVersions: true,
       canViewSlotUsage: true,
       canViewMakeupSchedule: true,
+      canViewTotalSlots: true,
       canEditCourseSectionDetails: true,
       canImportCourseData: true,
       canExportCourseData: true,
@@ -40,6 +41,9 @@ const SEED_USERS: (User & { password_plaintext: string })[] = [
       canCustomizeTheme: true,
       canDragAndDrop: true,
       canViewSlotHistory: true,
+      canViewEditableRoutine: true,
+      canViewPublishedRoutine: true,
+      canPublishRoutine: true,
     },
     programManagementAccess: {
         canAddProgram: true,
@@ -53,42 +57,42 @@ const SEED_USERS: (User & { password_plaintext: string })[] = [
   {
     id: 'user-2', name: 'Moderator User', email: 'moderator@rbrms.com', role: 'moderator', password_plaintext: '200001', avatar: '🛡️', employeeId: '200001', designation: 'Moderator', makeupSlotBookingAccess: 'full', bulkAssignAccess: 'none',
     roomEditAccess: { canManageRoomManagement: false, canAddBuilding: false, canAddRoom: false, canDeleteRoom: false, canViewRoomDetail: false, canEditAssignToProgram: false, canEditShareWithPrograms: false, canEditDetailsTab: false, canEditSlotsTab: false },
-    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: true, canViewMakeupSchedule: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true },
+    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: true, canViewMakeupSchedule: true, canViewTotalSlots: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true, canViewEditableRoutine: true, canViewPublishedRoutine: true, canPublishRoutine: false },
     programManagementAccess: { canAddProgram: false, canEditProgram: false },
     notificationAccess: { canGetNotification: true, canApproveSlots: false },
   },
   {
     id: 'user-3', name: 'Routine Organizer', email: 'organizer@rbrms.com', role: 'routine-organizer', password_plaintext: '300001', avatar: '📋', employeeId: '300001', designation: 'Routine Coordinator', makeupSlotBookingAccess: 'full', bulkAssignAccess: 'full',
     roomEditAccess: { canManageRoomManagement: true, canAddBuilding: true, canAddRoom: true, canDeleteRoom: true, canViewRoomDetail: true, canEditAssignToProgram: true, canEditShareWithPrograms: true, canEditDetailsTab: true, canEditSlotsTab: true, canImportRoomData: true, canExportRoomData: true },
-    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: true, canManageVersions: true, canViewSlotUsage: true, canViewMakeupSchedule: true, canEditCourseSectionDetails: true, canImportCourseData: true, canExportCourseData: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: true, canViewSlotHistory: true },
+    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: true, canManageVersions: true, canViewSlotUsage: true, canViewMakeupSchedule: true, canViewTotalSlots: true, canEditCourseSectionDetails: true, canImportCourseData: true, canExportCourseData: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: true, canViewSlotHistory: true, canViewEditableRoutine: true, canViewPublishedRoutine: true, canPublishRoutine: true },
     programManagementAccess: { canAddProgram: true, canEditProgram: true },
     notificationAccess: { canGetNotification: true, canApproveSlots: true },
   },
   {
     id: 'user-4', name: 'Coordination Officer', email: 'co@rbrms.com', role: 'coordination-officer', password_plaintext: '400001', avatar: '🤝', employeeId: '400001', designation: 'Department Coordinator', makeupSlotBookingAccess: 'full', bulkAssignAccess: 'none',
     roomEditAccess: { canManageRoomManagement: false, canAddBuilding: false, canAddRoom: false, canDeleteRoom: false, canViewRoomDetail: false, canEditAssignToProgram: false, canEditShareWithPrograms: false, canEditDetailsTab: false, canEditSlotsTab: false },
-    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: true, canViewMakeupSchedule: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true },
+    dashboardAccess: { canViewCourseList: true, canViewSectionList: true, canViewRoomList: true, canViewTeacherList: true, canViewSlotRequirement: true, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: true, canViewMakeupSchedule: true, canViewTotalSlots: true, classMonitoringAccess: 'full', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: true, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true, canViewEditableRoutine: true, canViewPublishedRoutine: true, canPublishRoutine: true },
     programManagementAccess: { canAddProgram: false, canEditProgram: false },
     notificationAccess: { canGetNotification: true, canApproveSlots: true },
   },
   {
     id: 'user-5', name: 'Teacher User', email: 'teacher@rbrms.com', role: 'teacher', password_plaintext: '500001', avatar: '🧑‍🏫', employeeId: '500001', designation: 'Lecturer', makeupSlotBookingAccess: 'own', bulkAssignAccess: 'none',
     roomEditAccess: { canManageRoomManagement: false, canAddBuilding: false, canAddRoom: false, canDeleteRoom: false, canViewRoomDetail: false, canEditAssignToProgram: false, canEditShareWithPrograms: false, canEditDetailsTab: false, canEditSlotsTab: false },
-    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: true, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: true, classMonitoringAccess: 'own', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true },
+    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: true, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: true, canViewTotalSlots: false, classMonitoringAccess: 'own', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: true, canViewEditableRoutine: true, canViewPublishedRoutine: true, canPublishRoutine: false },
     programManagementAccess: { canAddProgram: false, canEditProgram: false },
     notificationAccess: { canGetNotification: false, canApproveSlots: false },
   },
   {
     id: 'user-6', name: 'Regular User', email: 'user@rbrms.com', role: 'user', password_plaintext: '600001', avatar: '👤', employeeId: '600001', designation: 'Staff', makeupSlotBookingAccess: 'none', bulkAssignAccess: 'none',
     roomEditAccess: { canManageRoomManagement: false, canAddBuilding: false, canAddRoom: false, canDeleteRoom: false, canViewRoomDetail: false, canEditAssignToProgram: false, canEditShareWithPrograms: false, canEditDetailsTab: false, canEditSlotsTab: false },
-    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: false, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: false, canEditCourseSectionDetails: false, canImportCourseData: false, canExportCourseData: false, classMonitoringAccess: 'none', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: false },
+    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: false, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: false, canViewTotalSlots: false, canEditCourseSectionDetails: false, canImportCourseData: false, canExportCourseData: false, classMonitoringAccess: 'none', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: false, canViewEditableRoutine: false, canViewPublishedRoutine: true, canPublishRoutine: false },
     programManagementAccess: { canAddProgram: false, canEditProgram: false },
     notificationAccess: { canGetNotification: false, canApproveSlots: false },
   },
   {
     id: 'user-7', name: 'Student User', email: 'student@rbrms.com', role: 'student', password_plaintext: '700001', avatar: '🎓', employeeId: '700001', designation: 'Student', makeupSlotBookingAccess: 'none', bulkAssignAccess: 'none',
     roomEditAccess: { canManageRoomManagement: false, canAddBuilding: false, canAddRoom: false, canDeleteRoom: false, canViewRoomDetail: false, canEditAssignToProgram: false, canEditShareWithPrograms: false, canEditDetailsTab: false, canEditSlotsTab: false },
-    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: false, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: false, canEditCourseSectionDetails: false, canImportCourseData: false, canExportCourseData: false, classMonitoringAccess: 'none', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: false },
+    dashboardAccess: { canViewCourseList: false, canViewSectionList: false, canViewRoomList: false, canViewTeacherList: false, canViewSlotRequirement: false, canAutoAssign: false, canManageVersions: false, canViewSlotUsage: false, canViewMakeupSchedule: false, canViewTotalSlots: false, canEditCourseSectionDetails: false, canImportCourseData: false, canExportCourseData: false, classMonitoringAccess: 'none', canManageProgramSetup: false, canManageDefaultSlots: false, canManageSemesterSetup: false, canViewSectionTable: false, canCustomizeTheme: false, canDragAndDrop: false, canViewSlotHistory: false, canViewEditableRoutine: false, canViewPublishedRoutine: true, canPublishRoutine: false },
     programManagementAccess: { canAddProgram: false, canEditProgram: false },
     notificationAccess: { canGetNotification: false, canApproveSlots: false },
   }
@@ -150,6 +154,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     canManageVersions: false,
     canViewSlotUsage: false,
     canViewMakeupSchedule: false,
+    canViewTotalSlots: false,
     canEditCourseSectionDetails: false,
     canImportCourseData: false,
     canExportCourseData: false,
@@ -161,6 +166,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     canCustomizeTheme: false,
     canDragAndDrop: false,
     canViewSlotHistory: false,
+    canViewEditableRoutine: false,
+    canViewPublishedRoutine: false,
+    canPublishRoutine: false,
   };
   const defaultProgramManagementAccess: ProgramManagementAccess = {
     canAddProgram: false,
@@ -227,7 +235,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
           
           const existingDashboardAccess = migratedUser.dashboardAccess || {};
-          const migratedDashboardAccess = { ...defaultDashboardAccess, ...existingDashboardAccess };
+          const migratedDashboardAccess = {
+              ...defaultDashboardAccess,
+              ...existingDashboardAccess,
+              canViewEditableRoutine: existingDashboardAccess.canViewEditableRoutine ?? true,
+              canViewPublishedRoutine: existingDashboardAccess.canViewPublishedRoutine ?? true,
+              canPublishRoutine: existingDashboardAccess.canPublishRoutine ?? existingDashboardAccess.canManageVersions ?? false,
+          };
 
           // New migration: logAttendanceAccess -> classMonitoringAccess
           if ('logAttendanceAccess' in migratedDashboardAccess) {

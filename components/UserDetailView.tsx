@@ -49,6 +49,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     canManageVersions: "Manage Routine Versions",
     canViewSlotUsage: "View Slot Usage",
     canViewMakeupSchedule: "View Make-up Schedule",
+    canViewTotalSlots: "View Total Slots",
     canEditCourseSectionDetails: "Edit Course/Section Details",
     canImportCourseData: "Import Course Data",
     canExportCourseData: "Export Course Data",
@@ -60,6 +61,9 @@ const PERMISSION_LABELS: Record<string, string> = {
     canCustomizeTheme: "Customize Theme",
     canDragAndDrop: "Drag & Drop Scheduling",
     canViewSlotHistory: "View Slot History",
+    canViewEditableRoutine: "View Editable Routine",
+    canViewPublishedRoutine: "View Published Routine",
+    canPublishRoutine: "Publish Routines",
     // ProgramManagementAccess
     canAddProgram: "Add New Program",
     canEditProgram: "Edit Program Details",
@@ -78,6 +82,7 @@ const defaultDashboardAccess: DashboardAccess = {
   canManageVersions: false,
   canViewSlotUsage: false,
   canViewMakeupSchedule: false,
+  canViewTotalSlots: false,
   canEditCourseSectionDetails: false,
   canImportCourseData: false,
   canExportCourseData: false,
@@ -137,6 +142,29 @@ const PermissionGroup: React.FC<{ title: string; children: React.ReactNode; colo
             <div className="p-4">
                 {children}
             </div>
+        </div>
+    );
+};
+
+const InfoCard = ({ title, mainValue, icon, gradientClasses, disabledTooltip }: { title: string, mainValue: string | number, icon: React.ReactElement, gradientClasses?: string, disabledTooltip?: string }) => {
+    const isGradient = !!gradientClasses;
+    const isDisabled = mainValue === '--';
+    const cardClasses = `p-1.5 rounded-lg shadow-lg flex flex-col justify-between relative ${isGradient ? gradientClasses : 'bg-white'} ${isDisabled ? 'opacity-60' : ''}`;
+
+    return (
+        <div className={cardClasses} title={disabledTooltip}>
+            <div>
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className={`text-[10px] font-medium ${isGradient ? 'text-white/80' : 'text-gray-500'}`}>{title}</p>
+                        <p className={`text-lg font-bold ${isGradient ? 'text-white' : 'text-gray-800'}`}>{mainValue}</p>
+                    </div>
+                    <div className={`${isGradient ? 'bg-white/20 text-white' : 'bg-teal-100 text-teal-600'} p-1 rounded-md`}>
+                        {React.cloneElement(icon as React.ReactElement<any>, { className: "h-3.5 w-3.5" })}
+                    </div>
+                </div>
+            </div>
+            <div className="mt-1 h-1"></div>
         </div>
     );
 };
@@ -471,6 +499,29 @@ const UserDetailView: React.FC<UserDetailViewProps> = ({
         </div>
     );
   };
+  
+    const statsForUser = useMemo(() => {
+        if (!user || !isTeacher || !selectedSemesterIdForRoutineView) {
+            return { courseCount: 0, sectionCount: 0, creditLoad: 0, weeklyRequirement: 0, bookedSlots: 0 };
+        }
+
+        const teacherCourses = coursesData.filter(c =>
+            c.teacherId === user.employeeId && c.semester === selectedSemesterIdForRoutineView
+        );
+
+        if (teacherCourses.length === 0) {
+            return { courseCount: 0, sectionCount: 0, creditLoad: 0, weeklyRequirement: 0, bookedSlots: 0 };
+        }
+
+        const courseCount = new Set(teacherCourses.map(c => c.courseCode)).size;
+        const sectionCount = teacherCourses.length;
+        const creditLoad = teacherCourses.reduce((sum, c) => sum + c.credit, 0);
+        const weeklyRequirement = teacherCourses.reduce((sum, c) => sum + (c.weeklyClass || 0), 0);
+        const bookedSlots = teacherCourses.reduce((sum, c) => sum + (ciwCounts.get(c.sectionId) || 0), 0);
+
+        return { courseCount, sectionCount, creditLoad, weeklyRequirement, bookedSlots };
+    }, [user, isTeacher, coursesData, selectedSemesterIdForRoutineView, ciwCounts]);
+
 
   if (authLoading) {
     return <div className="p-6 text-center text-gray-500">Loading user details...</div>;
@@ -491,6 +542,16 @@ const UserDetailView: React.FC<UserDetailViewProps> = ({
     }
     return <span className="text-3xl">{avatar || '❓'}</span>;
   };
+  
+    const gradients = [
+        'bg-gradient-to-br from-blue-500 to-indigo-600',
+        'bg-gradient-to-br from-green-500 to-teal-600',
+        'bg-gradient-to-br from-purple-500 to-pink-600',
+        'bg-gradient-to-br from-yellow-500 to-orange-600',
+        'bg-gradient-to-br from-cyan-500 to-sky-600',
+    ];
+
+    const userDashboardAccess = user?.dashboardAccess;
 
   return (
     <div className="h-full w-full bg-slate-100 rounded-lg shadow-xl flex flex-col overflow-hidden relative">
@@ -596,6 +657,45 @@ const UserDetailView: React.FC<UserDetailViewProps> = ({
 
         {/* Main Content */}
         <main className="flex-grow min-h-0 overflow-y-auto custom-scrollbar p-4 sm:p-6">
+            {isTeacher && selectedSemesterIdForRoutineView && (
+                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+                    <InfoCard 
+                        title="Assigned Courses" 
+                        mainValue={userDashboardAccess?.canViewCourseList ? statsForUser.courseCount : '--'}
+                        disabledTooltip={!userDashboardAccess?.canViewCourseList ? "Permission denied: canViewCourseList" : undefined}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>} 
+                        gradientClasses={gradients[0]} 
+                    />
+                    <InfoCard 
+                        title="Assigned Sections" 
+                        mainValue={userDashboardAccess?.canViewSectionList ? statsForUser.sectionCount : '--'}
+                        disabledTooltip={!userDashboardAccess?.canViewSectionList ? "Permission denied: canViewSectionList" : undefined}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>} 
+                        gradientClasses={gradients[1]}
+                    />
+                    <InfoCard 
+                        title="Total Credit Load" 
+                        mainValue={userDashboardAccess?.canViewSectionList ? statsForUser.creditLoad.toFixed(2) : '--'}
+                        disabledTooltip={!userDashboardAccess?.canViewSectionList ? "Permission denied: canViewSectionList" : undefined}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} 
+                        gradientClasses={gradients[2]}
+                    />
+                    <InfoCard 
+                        title="Weekly Requirement" 
+                        mainValue={userDashboardAccess?.canViewSlotRequirement ? statsForUser.weeklyRequirement : '--'}
+                        disabledTooltip={!userDashboardAccess?.canViewSlotRequirement ? "Permission denied: canViewSlotRequirement" : undefined}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5m-5 2a9 9 0 001.378 5.622M20 20v-5h-5m5 2a9 9 0 00-1.378-5.622" /></svg>} 
+                        gradientClasses={gradients[3]}
+                    />
+                    <InfoCard 
+                        title="Booked Slots (CIW)" 
+                        mainValue={userDashboardAccess?.canViewSlotUsage ? statsForUser.bookedSlots : '--'}
+                        disabledTooltip={!userDashboardAccess?.canViewSlotUsage ? "Permission denied: canViewSlotUsage" : undefined}
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} 
+                        gradientClasses={gradients[4]}
+                    />
+                </div>
+            )}
             {activeDetailTab === 'settings' && (
                 <div className="space-y-6 max-w-5xl mx-auto">
                     {isTeacher && (
@@ -625,10 +725,13 @@ const UserDetailView: React.FC<UserDetailViewProps> = ({
                                 {user.role === 'admin' && (<p className="text-xs text-teal-600 mt-2 italic">Admin role has access to all programs by default.</p>)}
                             </div>
                             <div className="space-y-4">
-                                <PermissionGroup title="Dashboard Access" colorIndex={0}>
+                                <PermissionGroup title="Routine Access & Actions" colorIndex={0}>
+                                    {renderPermissionGroup(['canViewEditableRoutine', 'canViewPublishedRoutine', 'canPublishRoutine'], 'dashboardAccess')}
+                                </PermissionGroup>
+                                <PermissionGroup title="Dashboard Access" colorIndex={1}>
                                     {renderPermissionGroup(['canViewCourseList', 'canViewSectionList', 'canViewRoomList', 'canViewTeacherList', 'canViewSlotRequirement', 'canViewSlotUsage', 'canViewMakeupSchedule', 'canViewSectionTable', 'canCustomizeTheme'], 'dashboardAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="Routine Management" colorIndex={1}>
+                                <PermissionGroup title="Routine Management" colorIndex={2}>
                                     <div className="space-y-4">
                                         {renderPermissionGroup(['canAutoAssign', 'canManageVersions', 'canDragAndDrop', 'canViewSlotHistory'], 'dashboardAccess')}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
@@ -662,21 +765,21 @@ const UserDetailView: React.FC<UserDetailViewProps> = ({
                                         </div>
                                     </div>
                                 </PermissionGroup>
-                                <PermissionGroup title="Room Management" colorIndex={2}>
+                                <PermissionGroup title="Room Management" colorIndex={3}>
                                     {renderPermissionGroup(['canManageRoomManagement', 'canAddBuilding', 'canAddRoom', 'canDeleteRoom', 'canViewRoomDetail', 'canEditAssignToProgram', 'canEditShareWithPrograms', 'canEditDetailsTab', 'canEditSlotsTab', 'canImportRoomData', 'canExportRoomData'], 'roomEditAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="Course Data" colorIndex={3}>
+                                <PermissionGroup title="Course Data" colorIndex={4}>
                                     {renderPermissionGroup(['canEditCourseSectionDetails', 'canImportCourseData', 'canExportCourseData'], 'dashboardAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="System Setup" colorIndex={4}>
+                                <PermissionGroup title="System Setup" colorIndex={5}>
                                     {renderPermissionGroup(['canManageProgramSetup', 'canManageDefaultSlots', 'canManageSemesterSetup'], 'dashboardAccess')}
                                 </PermissionGroup>
                                 {user.dashboardAccess?.canManageProgramSetup && (
-                                <PermissionGroup title="Program Management" colorIndex={5}>
+                                <PermissionGroup title="Program Management" colorIndex={6}>
                                     {renderPermissionGroup(['canAddProgram', 'canEditProgram'], 'programManagementAccess')}
                                 </PermissionGroup>
                                 )}
-                                <PermissionGroup title="Notifications" colorIndex={6}>
+                                <PermissionGroup title="Notifications" colorIndex={7}>
                                     {renderPermissionGroup(['canGetNotification', 'canApproveSlots'], 'notificationAccess')}
                                 </PermissionGroup>
                             </div>

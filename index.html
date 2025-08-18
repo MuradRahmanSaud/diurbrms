@@ -161,6 +161,23 @@
         from { opacity: 0; }
         to { opacity: 1; }
       }
+      
+      /* Keyframes for Login Screen Animations */
+      @keyframes fade-in-up {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-in-up {
+        animation: fade-in-up 0.5s ease-out forwards;
+        opacity: 0; /* Start hidden */
+      }
+
 
       /* Text shadow utilities */
       .text-shadow-md { text-shadow: 0 2px 4px rgba(0,0,0,0.5); }

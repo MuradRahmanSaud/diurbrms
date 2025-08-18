@@ -25,6 +25,7 @@ interface SlotDetailModalProps {
   activeProgramIdInSidebar: string | null;
   selectedSemesterIdForRoutineView: string | null;
   pendingChanges: PendingChange[];
+  isEditable: boolean;
 }
 
 const colorMapping: { [key: string]: string } = {
@@ -352,6 +353,7 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
   activeProgramIdInSidebar,
   selectedSemesterIdForRoutineView,
   pendingChanges,
+  isEditable,
 }) => {
     const { user } = useAuth();
     const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -764,6 +766,48 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
     return courseOptions.find(c => c.sectionId === selectedCourseId);
   }, [selectedCourseId, courseOptions, assignmentMode, effectiveDefaultClassInfo]);
 
+  const footerContent = (
+    <div className="flex justify-between items-center">
+        <div>
+            {canViewHistory && (
+                <button
+                    type="button"
+                    onClick={() => setActiveTab(prev => prev === 'assignment' ? 'history' : 'assignment')}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300 flex items-center gap-2"
+                >
+                    {activeTab === 'assignment' ? (
+                        <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            View History
+                        </>
+                    ) : (
+                        <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Assignment
+                        </>
+                    )}
+                </button>
+            )}
+        </div>
+        <div className="flex justify-end gap-3">
+             <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300"
+            >
+                Close
+            </button>
+            <button
+                onClick={handleSaveChanges}
+                disabled={isAssignmentDisabled.disabled || !hasMadeChanges}
+                className="px-4 py-2 bg-teal-600 text-white font-medium rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+                Save Changes
+            </button>
+        </div>
+    </div>
+);
+
   return (
     <div
         className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden transform transition-all duration-300 ease-out"
@@ -803,7 +847,7 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
                             courses={courseOptions}
                             selectedCourseId={selectedCourseId}
                             onChange={applyAssignment}
-                            disabled={selectedDates.length === 0 && assignmentMode === 'specific'}
+                            disabled={isAssignmentDisabled.disabled || (selectedDates.length === 0 && assignmentMode === 'specific')}
                         />
                         <div className="flex w-full rounded-md bg-gray-200 p-0.5">
                             <button

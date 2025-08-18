@@ -518,6 +518,19 @@ export const useAppLogic = () => {
         if (dataToSave.id) {
             setAttendanceLog(prev => prev.map(entry => entry.id === dataToSave.id ? { ...entry, ...dataToSave } as AttendanceLogEntry : entry).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
         } else {
+            const isDuplicate = attendanceLog.some(entry => 
+                entry.date === dataToSave.date &&
+                entry.timeSlot === dataToSave.timeSlot &&
+                entry.roomNumber === dataToSave.roomNumber &&
+                entry.courseCode === dataToSave.courseCode
+            );
+
+            if (isDuplicate) {
+                alert("An attendance log entry for this class, at this specific time and location, already exists. Duplicate entry was not added.");
+                handleCloseLogAttendanceModal();
+                return;
+            }
+
              const newEntry: AttendanceLogEntry = {
                 ...dataToSave,
                 id: `att-${Date.now()}-${Math.random().toString(16).substring(2)}`,

@@ -1,10 +1,4 @@
 
-
-
-
-
-
-
 export type TimeSlot =
   | '08:30 AM - 10:00 AM'
   | '10:00 AM - 11:30 AM'
@@ -278,6 +272,7 @@ export interface RoutineVersion {
 export interface SemesterRoutineData {
     versions: RoutineVersion[];
     activeVersionId: string | null;
+    publishedVersionId?: string | null;
 }
 
 // ---- Auth Types ----
@@ -308,6 +303,7 @@ export interface DashboardAccess {
   canManageVersions: boolean;
   canViewSlotUsage: boolean;
   canViewMakeupSchedule: boolean;
+  canViewTotalSlots?: boolean;
   canEditCourseSectionDetails?: boolean;
   canImportCourseData?: boolean;
   canExportCourseData?: boolean;
@@ -319,6 +315,10 @@ export interface DashboardAccess {
   canCustomizeTheme?: boolean;
   canDragAndDrop?: boolean;
   canViewSlotHistory?: boolean;
+  // New permissions
+  canViewEditableRoutine?: boolean;
+  canViewPublishedRoutine?: boolean;
+  canPublishRoutine?: boolean;
 }
 
 export type AssignAccessLevel = 'none' | 'own' | 'full';

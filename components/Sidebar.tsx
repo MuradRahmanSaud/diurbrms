@@ -51,6 +51,7 @@ interface SidebarProps {
   setCoursesData: React.Dispatch<React.SetStateAction<EnrollmentEntry[]>>;
   routineViewMode: RoutineViewMode;
   onToggleRoutineViewMode: () => void;
+  routineDisplayMode: 'published' | 'editable';
   selectedLevelTermFilter: string | null;
   setSelectedLevelTermFilter: (levelTerm: string | null) => void;
   selectedSectionFilter: string | null;
@@ -113,7 +114,7 @@ const StatCard = ({ title, value, icon, onClick, isActive, disabled }: { title: 
             </div>
             <div className="min-w-0">
                 <p className={`text-[10px] truncate ${titleClasses}`}>{title}</p>
-                <p className={`text-sm font-bold ${valueClasses}`}>{value}</p>
+                <p className={`text-sm font-bold ${valueClasses}`}>{disabled ? '--' : value}</p>
             </div>
         </button>
     );
@@ -248,7 +249,7 @@ const SlotRequirementTable = ({
 
     const uniqueLevelTerms = useMemo(() => {
         const terms = new Set(courses.map(c => c.levelTerm).filter(Boolean));
-        return Array.from(terms).sort((a, b) => {
+        return Array.from(terms).sort((a: string, b: string) => {
           const aMatch = a.match(/L(\d+)T(\d+)/);
           const bMatch = b.match(/L(\d+)T(\d+)/);
           if (aMatch && bMatch) {
@@ -257,7 +258,7 @@ const SlotRequirementTable = ({
             if (aL !== bL) return aL - bL;
             return aT - bT;
           }
-          return a.localeCompare(b);
+          return String(a).localeCompare(String(b));
         });
     }, [courses]);
 
@@ -286,31 +287,38 @@ const SlotRequirementTable = ({
     }, [courses, activeTab, levelTermFilter, searchQuery]);
 
     const sortedCourses = useMemo(() => {
-        let sortableItems = [...filteredForTabAndSearchCourses];
+        const sortableItems: EnrollmentEntry[] = [...filteredForTabAndSearchCourses];
         if (sortConfig !== null) {
             sortableItems.sort((a, b) => {
+                const { key, direction } = sortConfig;
                 let aValue: string | number;
                 let bValue: string | number;
 
-                if (sortConfig.key === 'ciw') {
-                    aValue = ciwCounts.get(a.sectionId) ?? 0;
-                    bValue = ciwCounts.get(b.sectionId) ?? 0;
-                } else {
-                    const key = sortConfig.key as keyof EnrollmentEntry;
-                    const valA = a[key];
-                    const valB = b[key];
-                    
-                    if (typeof valA === 'number' || typeof valB === 'number') {
-                        aValue = typeof valA === 'number' ? valA : -1;
-                        bValue = typeof valB === 'number' ? valB : -1;
-                    } else {
-                        aValue = String(valA ?? '').toLowerCase();
-                        bValue = String(valB ?? '').toLowerCase();
-                    }
+                switch (key) {
+                    case 'ciw':
+                        aValue = ciwCounts.get(a.sectionId) ?? 0;
+                        bValue = ciwCounts.get(b.sectionId) ?? 0;
+                        break;
+                    case 'studentCount':
+                        aValue = a.studentCount;
+                        bValue = b.studentCount;
+                        break;
+                    case 'weeklyClass':
+                        aValue = a.weeklyClass ?? -1;
+                        bValue = b.weeklyClass ?? -1;
+                        break;
+                    case 'courseCode':
+                        aValue = a.courseCode.toLowerCase();
+                        bValue = b.courseCode.toLowerCase();
+                        break;
+                    case 'section':
+                        aValue = a.section.toLowerCase();
+                        bValue = b.section.toLowerCase();
+                        break;
                 }
 
-                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return direction === 'asc' ? 1 : -1;
                 return 0;
             });
         }
@@ -608,7 +616,7 @@ const SlotRequirementTable = ({
                 {sortedCourses.length > 0 ? (
                     <div style={{ position: 'relative', height: `${totalHeight}px` }}>
                         <div style={{ position: 'absolute', top: `${paddingTop}px`, left: 0, right: 0 }}>
-                            {visibleCourses.map(course => {
+                            {visibleCourses.map((course: EnrollmentEntry) => {
                                 const isSchedulable = course.levelTerm && course.levelTerm.trim() !== '' && course.levelTerm !== 'N/A' &&
                                                         course.courseType && course.courseType !== 'N/A' &&
                                                         course.weeklyClass && course.weeklyClass > 0;
@@ -662,99 +670,191 @@ const SlotRequirementTable = ({
     );
 };
 
-const Sidebar: React.FC<SidebarProps> = React.memo(({ 
-  onMainViewChange, 
-  onOverlayToggle, 
-  currentMainView, 
-  currentOverlay,
-  onSelectProgramForRoutineView,
-  selectedProgramIdForRoutineView,
-  activeAssignedRoomTypeFilter,
-  setActiveAssignedRoomTypeFilter,
-  activeSharedRoomTypeFilter,
-  setActiveSharedRoomTypeFilter,
-  selectedSemesterIdForRoutineView,
-  setSelectedSemesterIdForRoutineView,
-  allSemesterConfigurations,
-  logout,
-  sidebarStats,
-  slotUsageStats,
-  ciwCounts,
-  classRequirementCounts,
-  dashboardTabFilter,
-  setDashboardTabFilter,
-  onShowCourseList,
-  onShowSectionList,
-  onShowRoomList,
-  onShowTeacherList,
-  onShowAttendanceLog,
-  coursesData,
-  setCoursesData,
-  routineViewMode,
-  onToggleRoutineViewMode,
-  selectedLevelTermFilter,
-  setSelectedLevelTermFilter,
-  selectedSectionFilter,
-  setSelectedSectionFilter,
-  selectedTeacherIdFilter,
-  setSelectedTeacherIdFilter,
-  selectedCourseSectionIdsFilter,
-  setSelectedCourseSectionIdsFilter,
-  onPreviewTeacherRoutine,
-  onPreviewLevelTermRoutine,
-  onPreviewFullRoutine,
-  onPreviewCourseSectionRoutine,
-  onUpdateLevelTerm,
-  onUpdateWeeklyClass,
-  onUpdateCourseType,
-  onBulkAssign,
-  isBulkAssignDisabled,
-  bulkAssignTooltip,
-  versions = [],
-  activeVersionId,
-  onVersionChange,
-  onDeleteVersion,
-  unreadNotificationCount,
-  pendingRequestCount,
-  setRoutineData,
+const RoutineFiltersAndPreview = ({
+    user,
+    coursesData,
+    selectedSemesterIdForRoutineView,
+    selectedProgramIdForRoutineView,
+    programs,
+    handleTeacherSelect,
+    selectedTeacherIdFilter,
+    handleCourseSectionSelect,
+    selectedCourseSectionIdsFilter,
+    handleLevelTermSelect,
+    selectedLevelTermFilter,
+    setSelectedSectionFilter,
+    selectedSectionFilter,
+    handlePreviewClick,
+    isPreviewDisabled,
+    previewTitle,
 }) => {
+    const levelTermFilters = useMemo(() => {
+        let relevantCourses = coursesData;
+        if (selectedSemesterIdForRoutineView) {
+            relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
+        }
+        const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
+        if (selectedProgram) {
+            relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
+        }
+        const terms = new Set(relevantCourses.map(c => c.levelTerm).filter(Boolean));
+        return Array.from(terms).sort((a: string, b: string) => {
+            const aMatch = a.match(/L(\d+)T(\d+)/);
+            const bMatch = b.match(/L(\d+)T(\d+)/);
+            if (aMatch && bMatch) {
+                const [, aL, aT] = aMatch.map(Number);
+                const [, bL, bT] = bMatch.map(Number);
+                if (aL !== bL) return aL - bL;
+                return aT - bT;
+            }
+            return a.localeCompare(b);
+        });
+    }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
+
+    const teacherFilterOptions = useMemo(() => {
+        let relevantCourses = coursesData;
+        if (selectedSemesterIdForRoutineView) {
+            relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
+        }
+        const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
+        if (selectedProgram) {
+            relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
+        }
+        const teacherMap = new Map<string, { employeeId: string; teacherName: string; designation: string }>();
+        relevantCourses.forEach(course => {
+            if (course.teacherId && course.teacherName && !teacherMap.has(course.teacherId)) {
+                teacherMap.set(course.teacherId, { employeeId: course.teacherId, teacherName: course.teacherName, designation: course.designation });
+            }
+        });
+        return Array.from(teacherMap.values()).sort((a, b) => a.teacherName.localeCompare(b.teacherName));
+    }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
+
+    const courseSectionFilterOptions = useMemo(() => {
+        let relevantCourses = coursesData;
+        if (selectedSemesterIdForRoutineView) {
+            relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
+        }
+        const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
+        if (selectedProgram) {
+            relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
+        }
+        return relevantCourses.sort((a, b) => a.courseCode.localeCompare(b.courseCode) || a.section.localeCompare(b.section));
+    }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
+    
+    const sectionFilterOptions = useMemo(() => {
+        if (!selectedLevelTermFilter) return [];
+        let relevantCourses = coursesData;
+        if (selectedSemesterIdForRoutineView) {
+            relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
+        }
+        const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
+        if (selectedProgram) {
+            relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
+        }
+        relevantCourses = relevantCourses.filter(c => c.levelTerm === selectedLevelTermFilter);
+        const sections = new Set(relevantCourses.map(c => c.section));
+        return Array.from(sections).sort((a,b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs, selectedLevelTermFilter]);
+
+    const levelTermGrid = [['L1T1', 'L1T2', 'L1T3'], ['L2T1', 'L2T2', 'L2T3'], ['L3T1', 'L3T2', 'L3T3'], ['L4T1', 'L4T2', 'L4T3']];
+
+    return (
+        <div className="mt-3 bg-teal-900 p-2 rounded-md shadow-sm border border-teal-800 flex flex-col gap-4">
+             <div className="grid grid-cols-2 gap-2">
+                {teacherFilterOptions.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Teacher</h4>
+                    <SearchableTeacherDropdown
+                      teachers={teacherFilterOptions}
+                      selectedTeacherId={selectedTeacherIdFilter}
+                      onTeacherSelect={handleTeacherSelect}
+                      buttonClassName="w-full flex items-center justify-between p-1 text-[11px] sm:text-xs rounded-md transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent-yellow-400)] focus:ring-offset-1 focus:ring-offset-teal-900 bg-teal-800 border border-teal-600 shadow-sm hover:bg-teal-700/50"
+                      dropdownClassName="absolute z-20 w-full mt-1 bg-teal-900 rounded-md shadow-lg max-h-60 overflow-auto custom-scrollbar border border-teal-600"
+                    />
+                  </div>
+                )}
+                {courseSectionFilterOptions.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Section</h4>
+                    <SearchableCourseSectionDropdown
+                      courses={courseSectionFilterOptions}
+                      selectedSectionIds={selectedCourseSectionIdsFilter}
+                      onSelectionChange={handleCourseSectionSelect}
+                    />
+                  </div>
+                )}
+              </div>
+              
+              {levelTermFilters.length > 0 && (
+                <div>
+                    <div className="flex justify-between items-center mb-1">
+                        <h4 className="text-[10px] text-teal-200 font-semibold">Filter by Level-Term</h4>
+                    </div>
+                    <div className="space-y-1">
+                        <div className="grid grid-cols-2 gap-1">
+                            <button onClick={() => handleLevelTermSelect(null)} className={`w-full px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === null ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>All</button>
+                            <button onClick={() => handleLevelTermSelect('N/A')} className={`w-full px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === 'N/A' ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>N/A</button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                            {levelTermGrid.flat().map(term => (<button key={term} onClick={() => handleLevelTermSelect(term)} className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === term ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>{term.replace('T', '-T')}</button>))}
+                        </div>
+                    </div>
+                </div>
+              )}
+              {selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A' && sectionFilterOptions.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Section</h4>
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar pr-1">
+                    <button onClick={() => setSelectedSectionFilter(null)} className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedSectionFilter === null ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>All</button>
+                    {sectionFilterOptions.map(section => (<button key={section} onClick={() => setSelectedSectionFilter(section)} className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedSectionFilter === section ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>{section}</button>))}
+                  </div>
+                </div>
+              )}
+              <div className="border-t border-teal-800/50 pt-3 mt-1">
+                <button onClick={handlePreviewClick} disabled={isPreviewDisabled} className="w-full flex items-center justify-center gap-2 p-2 text-sm font-semibold text-teal-800 bg-yellow-400 rounded-md shadow-md transition-all enabled:hover:bg-yellow-300 disabled:bg-teal-800 disabled:text-teal-500 disabled:cursor-not-allowed" title={previewTitle}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
+                  <span>Preview Routine</span>
+                </button>
+              </div>
+        </div>
+    );
+};
+
+
+const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
+  const { 
+    onMainViewChange, onOverlayToggle, currentMainView, currentOverlay, onSelectProgramForRoutineView,
+    selectedProgramIdForRoutineView, activeAssignedRoomTypeFilter, setActiveAssignedRoomTypeFilter,
+    activeSharedRoomTypeFilter, setActiveSharedRoomTypeFilter, selectedSemesterIdForRoutineView,
+    setSelectedSemesterIdForRoutineView, allSemesterConfigurations, logout, sidebarStats, slotUsageStats,
+    ciwCounts, classRequirementCounts, dashboardTabFilter, setDashboardTabFilter, onShowCourseList,
+    onShowSectionList, onShowRoomList, onShowTeacherList, onShowAttendanceLog, coursesData, setCoursesData,
+    routineViewMode, onToggleRoutineViewMode, routineDisplayMode, selectedLevelTermFilter, setSelectedLevelTermFilter,
+    selectedSectionFilter, setSelectedSectionFilter, selectedTeacherIdFilter, setSelectedTeacherIdFilter,
+    selectedCourseSectionIdsFilter, setSelectedCourseSectionIdsFilter, onPreviewTeacherRoutine, onPreviewLevelTermRoutine,
+    onPreviewFullRoutine, onPreviewCourseSectionRoutine, onUpdateLevelTerm, onUpdateWeeklyClass, onUpdateCourseType,
+    onBulkAssign, isBulkAssignDisabled, bulkAssignTooltip, versions = [], activeVersionId, onVersionChange,
+    onDeleteVersion, unreadNotificationCount, pendingRequestCount, setRoutineData
+  } = props;
   const { programs: allProgramsFromCtx, loading: programsLoading } = usePrograms();
   const { user } = useAuth();
   const [showSlotRequirements, setShowSlotRequirements] = useState(false);
   const [editingSection, setEditingSection] = useState<EnrollmentEntry | null>(null);
   
   const programs = useMemo(() => {
-    if (programsLoading || !allProgramsFromCtx) {
-        return [];
-    }
-
-    // Admins see all programs.
-    if (user?.role === 'admin') {
-        return allProgramsFromCtx;
-    }
-
+    if (programsLoading || !allProgramsFromCtx) return [];
+    if (user?.role === 'admin') return allProgramsFromCtx;
     if (user) {
-        // Check if the user is a teacher by seeing if their employeeId is in the courses data.
         const isTeacher = user.employeeId && coursesData.some(course => course.teacherId === user.employeeId);
-
         if (isTeacher) {
-            // If they are a teacher, derive their accessible programs from their course load.
-            const teacherProgramPIds = new Set(
-                coursesData
-                    .filter(course => course.teacherId === user.employeeId)
-                    .map(course => course.pId)
-            );
+            const teacherProgramPIds = new Set(coursesData.filter(course => course.teacherId === user.employeeId).map(course => course.pId));
             return allProgramsFromCtx.filter(p => teacherProgramPIds.has(p.pId));
         }
-
-        // For other non-admin users, fall back to the manually assigned access list.
         if (Array.isArray(user.accessibleProgramPIds)) {
             const accessiblePIds = new Set(user.accessibleProgramPIds);
             return allProgramsFromCtx.filter(p => accessiblePIds.has(p.pId));
         }
     }
-
-    // Default to an empty list if no other conditions are met.
     return [];
   }, [allProgramsFromCtx, user, programsLoading, coursesData]);
 
@@ -773,45 +873,38 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
     if (selectedProgram) {
       relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
     }
-    // Note: Filtering by dashboardTabFilter is removed from here. The SlotRequirementTable will handle its own internal filtering.
     return relevantCourses.sort((a,b) => a.courseCode.localeCompare(b.courseCode) || a.section.localeCompare(b.section));
   }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
 
   const filteredCoursesForDownload = useMemo(() => {
     let filtered = coursesData;
-
     if (selectedSemesterIdForRoutineView) {
       filtered = filtered.filter(c => c.semester === selectedSemesterIdForRoutineView);
     }
-    
     if (selectedProgramIdForRoutineView) {
       const selectedProgram = programs.find(p => p.id === selectedProgramIdForRoutineView);
       if (selectedProgram) {
         filtered = filtered.filter(c => c.pId === selectedProgram.pId);
       }
     }
-    
     return filtered;
   }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
 
-  // Semesters for the main routine view dropdown (shows only configured semesters)
   const uniqueSemestersForRoutineDropdown = useMemo(() => {
     const semesters = [...new Set(allSemesterConfigurations.map(c => c.targetSemester))];
     return semesters.sort((a, b) => {
         const semesterOrder = ['Spring', 'Summer', 'Fall'];
         const [aSem, aYear] = a.split(' ');
         const [bSem, bYear] = b.split(' ');
-        if (aYear !== bYear) return (parseInt(bYear) || 0) - (parseInt(aYear) || 0); // Sort by year descending
+        if (aYear !== bYear) return (parseInt(bYear) || 0) - (parseInt(aYear) || 0);
         return semesterOrder.indexOf(aSem) - semesterOrder.indexOf(bSem);
     });
   }, [allSemesterConfigurations]);
   
-  // This function now ONLY affects the routine view.
   const handleProgramQuickViewSelect = (programObjectId: string | null) => {
     onSelectProgramForRoutineView(programObjectId);
   };
   
-  // This function now ONLY affects the routine view.
   const handleSemesterQuickViewSelect = (semesterId: string | null) => {
     setSelectedSemesterIdForRoutineView(semesterId); 
   };
@@ -819,18 +912,18 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
   const handleTeacherSelect = useCallback((teacherId: string | null) => {
     setSelectedTeacherIdFilter(teacherId);
     if (teacherId) {
-      setSelectedLevelTermFilter(null); // Reset level-term filter
-      setSelectedSectionFilter(null); // Also reset section filter
-      setSelectedCourseSectionIdsFilter([]); // Reset course section filter
+      setSelectedLevelTermFilter(null);
+      setSelectedSectionFilter(null);
+      setSelectedCourseSectionIdsFilter([]);
     }
   }, [setSelectedTeacherIdFilter, setSelectedLevelTermFilter, setSelectedSectionFilter, setSelectedCourseSectionIdsFilter]);
 
   const handleLevelTermSelect = useCallback((levelTerm: string | null) => {
     setSelectedLevelTermFilter(levelTerm);
     if (levelTerm) {
-      setSelectedSectionFilter(null); // Also reset the subordinate section filter
-      setSelectedTeacherIdFilter(null); // Reset teacher filter
-      setSelectedCourseSectionIdsFilter([]); // Reset course section filter
+      setSelectedSectionFilter(null);
+      setSelectedTeacherIdFilter(null);
+      setSelectedCourseSectionIdsFilter([]);
     }
   }, [setSelectedLevelTermFilter, setSelectedSectionFilter, setSelectedTeacherIdFilter, setSelectedCourseSectionIdsFilter]);
 
@@ -845,21 +938,17 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
 
 
   const handleAssignedRoomTypeFilterClick = (filter: 'Theory' | 'Lab') => {
-    // Prevent unselecting. If a button is clicked, it becomes the active filter for this group.
     setActiveAssignedRoomTypeFilter(filter);
   };
 
   const handleSharedRoomTypeFilterClick = (filter: 'Theory' | 'Lab') => {
-    // Prevent unselecting. If a button is clicked, it becomes the active filter for this group.
     setActiveSharedRoomTypeFilter(filter);
   };
   
   const handleDashboardCardClick = (view: MainViewType) => {
-    // If the current view is already the one we want to show, toggle it off (back to routine)
     if (currentMainView === view) {
         onMainViewChange('routine');
     } else {
-        // Otherwise, switch to the new view
         onMainViewChange(view);
     }
   };
@@ -899,124 +988,20 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const semesterDropdownItemsForSearchable = useMemo(() => {
     return uniqueSemestersForRoutineDropdown.map(sem => ({
-      id: sem, 
-      pId: '', 
-      shortName: sem, 
-      fullName: '', 
-      faculty: '', 
-      type: 'Undergraduate' as ProgramType, 
-      semesterSystem: 'Tri-Semester' as SemesterSystem, 
-      programSpecificSlots: []
+      id: sem, pId: '', shortName: sem, fullName: '', faculty: '', type: 'Undergraduate' as ProgramType, semesterSystem: 'Tri-Semester' as SemesterSystem, programSpecificSlots: []
     }));
   }, [uniqueSemestersForRoutineDropdown]);
   
-  const levelTermFilters = useMemo(() => {
-    let relevantCourses = coursesData;
-    if (selectedSemesterIdForRoutineView) {
-      relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
-    }
-    const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
-    if (selectedProgram) {
-      relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
-    }
-    
-    const terms = new Set(relevantCourses.map(c => c.levelTerm).filter(Boolean)); // Filter out null/undefined
-    return Array.from(terms).sort((a, b) => {
-      const aMatch = a.match(/L(\d+)T(\d+)/);
-      const bMatch = b.match(/L(\d+)T(\d+)/);
-      if (aMatch && bMatch) {
-        const [, aL, aT] = aMatch.map(Number);
-        const [, bL, bT] = bMatch.map(Number);
-        if (aL !== bL) return aL - bL;
-        return aT - bT;
-      }
-      return a.localeCompare(b);
-    });
-  }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
-
-  const sectionFilterOptions = useMemo(() => {
-    if (!selectedLevelTermFilter) {
-      return [];
-    }
-    
-    let relevantCourses = coursesData;
-    if (selectedSemesterIdForRoutineView) {
-      relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
-    }
-    const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
-    if (selectedProgram) {
-      relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
-    }
-    
-    relevantCourses = relevantCourses.filter(c => c.levelTerm === selectedLevelTermFilter);
-    
-    const sections = new Set(relevantCourses.map(c => c.section));
-    return Array.from(sections).sort((a,b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs, selectedLevelTermFilter]);
-  
-  const teacherFilterOptions = useMemo(() => {
-    let relevantCourses = coursesData;
-    if (selectedSemesterIdForRoutineView) {
-      relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
-    }
-    const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
-    if (selectedProgram) {
-      relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
-    }
-
-    const teacherMap = new Map<string, { employeeId: string; teacherName: string; designation: string }>();
-    relevantCourses.forEach(course => {
-        if (course.teacherId && course.teacherName && !teacherMap.has(course.teacherId)) {
-            teacherMap.set(course.teacherId, {
-                employeeId: course.teacherId,
-                teacherName: course.teacherName,
-                designation: course.designation,
-            });
-        }
-    });
-    return Array.from(teacherMap.values()).sort((a, b) => a.teacherName.localeCompare(b.teacherName));
-  }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
-
-  const courseSectionFilterOptions = useMemo(() => {
-    let relevantCourses = coursesData;
-     if (selectedSemesterIdForRoutineView) {
-      relevantCourses = relevantCourses.filter(c => c.semester === selectedSemesterIdForRoutineView);
-    }
-    const selectedProgram = selectedProgramIdForRoutineView ? programs.find(p => p.id === selectedProgramIdForRoutineView) : null;
-    if (selectedProgram) {
-      relevantCourses = relevantCourses.filter(c => c.pId === selectedProgram.pId);
-    }
-    return relevantCourses.sort((a, b) => a.courseCode.localeCompare(b.courseCode) || a.section.localeCompare(b.section));
-  }, [coursesData, selectedSemesterIdForRoutineView, selectedProgramIdForRoutineView, programs]);
-
-
-  const handlePreviewClick = () => {
-    if (selectedCourseSectionIdsFilter.length > 0) {
-        onPreviewCourseSectionRoutine();
-    } else if (selectedTeacherIdFilter) {
-        onPreviewTeacherRoutine(selectedTeacherIdFilter);
-    } else if (selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A') {
-        onPreviewLevelTermRoutine();
-    } else {
-        onPreviewFullRoutine();
-    }
-  };
-
   const teacherForTitle = useMemo(() => {
     if (!selectedTeacherIdFilter) return null;
-    return teacherFilterOptions.find(t => t.employeeId === selectedTeacherIdFilter);
-  }, [selectedTeacherIdFilter, teacherFilterOptions]);
+    const teacher = coursesData.find(c => c.teacherId === selectedTeacherIdFilter);
+    return teacher ? { teacherName: teacher.teacherName } : null;
+  }, [selectedTeacherIdFilter, coursesData]);
 
   const previewTitle = useMemo(() => {
-    if (selectedCourseSectionIdsFilter.length > 0) {
-        return `Preview routine for ${selectedCourseSectionIdsFilter.length} selected sections`;
-    }
-    if (selectedTeacherIdFilter) {
-        return `Preview routine for ${teacherForTitle?.teacherName || 'selected teacher'}`;
-    }
-    if (selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A') {
-        return `Preview routine for ${selectedLevelTermFilter}${selectedSectionFilter ? ` Section ${selectedSectionFilter}` : ''}`;
-    }
+    if (selectedCourseSectionIdsFilter.length > 0) return `Preview routine for ${selectedCourseSectionIdsFilter.length} selected sections`;
+    if (selectedTeacherIdFilter) return `Preview routine for ${teacherForTitle?.teacherName || 'selected teacher'}`;
+    if (selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A') return `Preview routine for ${selectedLevelTermFilter}${selectedSectionFilter ? ` Section ${selectedSectionFilter}` : ''}`;
     if (selectedProgramIdForRoutineView && selectedSemesterIdForRoutineView) {
         const prog = programs.find(p => p.id === selectedProgramIdForRoutineView);
         return `Preview full routine for ${prog?.shortName || ''} (${selectedSemesterIdForRoutineView})`;
@@ -1026,247 +1011,16 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
 
   const isPreviewDisabled = !selectedProgramIdForRoutineView || !selectedSemesterIdForRoutineView;
 
-
-  const levelTermGrid = [['L1T1', 'L1T2', 'L1T3'], ['L2T1', 'L2T2', 'L2T3'], ['L3T1', 'L3T2', 'L3T3'], ['L4T1', 'L4T2', 'L4T3']];
-
   const canEditCourseSectionDetails = !!user?.dashboardAccess?.canEditCourseSectionDetails;
-
-  const statsDashboard = (
-      <div className="mt-3 space-y-2">
-          <div className="flex justify-between items-center mb-2">
-              <button 
-                onClick={onToggleRoutineViewMode}
-                disabled={selectedProgramIdForRoutineView === null}
-                className="flex items-center gap-2 text-xs font-semibold text-teal-200 hover:text-yellow-300 transition-colors focus:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                    selectedProgramIdForRoutineView === null
-                    ? "Select a program to change view mode"
-                    : routineViewMode === 'roomCentric'
-                    ? 'Switch to Day-Centric View'
-                    : 'Switch to Room-Centric View'
-                }
-              >
-                  {routineViewMode === 'roomCentric' ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                  )}
-                  Dashboard
-              </button>
-              <div className="flex items-center gap-1.5">
-                  {(user?.dashboardAccess?.canImportCourseData || user?.dashboardAccess?.canExportCourseData) && (
-                    <CourseDataTools 
-                      coursesData={coursesData}
-                      setCoursesData={setCoursesData}
-                      dataToDownload={filteredCoursesForDownload}
-                      buttonStyle='sidebar'
-                      canImport={!!user.dashboardAccess.canImportCourseData}
-                      canExport={!!user.dashboardAccess.canExportCourseData}
-                    />
-                  )}
-              </div>
-          </div>
-          <div className="flex gap-1 p-1 bg-teal-900 rounded-md">
-            {(['All', 'Theory', 'Lab'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setDashboardTabFilter(tab)}
-                className={`w-full text-center text-xs font-bold py-1.5 rounded-sm transition-all duration-200 ${
-                  dashboardTabFilter === tab 
-                    ? 'bg-yellow-400 text-teal-900 shadow' 
-                    : 'text-teal-200 hover:bg-teal-700/50'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-1.5">
-              <StatCard title="Courses" value={sidebarStats.uniqueCourseCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>} onClick={() => handleDashboardCardClick('courseList')} isActive={currentMainView === 'courseList'} disabled={!user?.dashboardAccess?.canViewCourseList} />
-              <StatCard title="Sections" value={sidebarStats.sectionCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>} onClick={() => handleDashboardCardClick('sectionList')} isActive={currentMainView === 'sectionList'} disabled={!user?.dashboardAccess?.canViewSectionList} />
-              <StatCard title="Rooms" value={sidebarStats.roomCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>} onClick={() => handleDashboardCardClick('roomList')} isActive={currentMainView === 'roomList'} disabled={!user?.dashboardAccess?.canViewRoomList} />
-              <StatCard title="Total Slots" value={sidebarStats.totalSlots} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>} />
-              <StatCard title="Slot Requirement" value={`${sidebarStats.bookedSlotRequirement} / ${sidebarStats.slotRequirement}`} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5m-5 2a9 9 0 001.378 5.622M20 20v-5h-5m5 2a9 9 0 00-1.378-5.622" /></svg>} onClick={() => setShowSlotRequirements(true)} disabled={!user?.dashboardAccess?.canViewSlotRequirement}/>
-              <StatCard title="Slot Usage" value={`${sidebarStats.bookedSlots} / ${sidebarStats.totalSlots}`} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} onClick={onToggleRoutineViewMode} disabled={!user?.dashboardAccess?.canViewSlotUsage} />
-              <StatCard title="Teachers" value={sidebarStats.teacherCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm-9 3a2 2 0 11-4 0 2 2 0 014 0z" /></svg>} onClick={() => handleDashboardCardClick('teacherList')} isActive={currentMainView === 'teacherList'} disabled={!user?.dashboardAccess?.canViewTeacherList} />
-              <StatCard title="Make-up Schedule" value={sidebarStats.attendanceLogCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>} onClick={onShowAttendanceLog} isActive={currentMainView === 'attendanceLog'} disabled={!user?.dashboardAccess?.canViewMakeupSchedule} />
-          </div>
-          {(levelTermFilters.length > 0 || teacherFilterOptions.length > 0 || courseSectionFilterOptions.length > 0) && (
-            <div className="mt-2 bg-teal-900 p-2 rounded-md shadow-sm border border-teal-800 flex flex-col gap-4">
-              
-              {/* Teacher and Section Filters Side-by-Side */}
-              <div className="grid grid-cols-2 gap-2">
-                {/* Filter by Teacher */}
-                {teacherFilterOptions.length > 0 && (
-                  <div>
-                    <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Teacher</h4>
-                    <SearchableTeacherDropdown
-                      teachers={teacherFilterOptions}
-                      selectedTeacherId={selectedTeacherIdFilter}
-                      onTeacherSelect={handleTeacherSelect}
-                      buttonClassName="w-full flex items-center justify-between p-1 text-[11px] sm:text-xs rounded-md transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent-yellow-400)] focus:ring-offset-1 focus:ring-offset-teal-900 bg-teal-800 border border-teal-600 shadow-sm hover:bg-teal-700/50"
-                      dropdownClassName="absolute z-20 w-full mt-1 bg-teal-900 rounded-md shadow-lg max-h-60 overflow-auto custom-scrollbar border border-teal-600"
-                    />
-                  </div>
-                )}
-
-                {/* Filter by Section */}
-                {courseSectionFilterOptions.length > 0 && (
-                  <div>
-                    <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Section</h4>
-                    <SearchableCourseSectionDropdown
-                      courses={courseSectionFilterOptions}
-                      selectedSectionIds={selectedCourseSectionIdsFilter}
-                      onSelectionChange={handleCourseSectionSelect}
-                    />
-                  </div>
-                )}
-              </div>
-              
-              {/* Filter by Level-Term */}
-              {levelTermFilters.length > 0 && (
-                <div>
-                    <div className="flex justify-between items-center mb-1">
-                        <h4 className="text-[10px] text-teal-200 font-semibold">Filter by Level-Term</h4>
-                    </div>
-                    <div className="space-y-1">
-                        <div className="grid grid-cols-2 gap-1">
-                            <button
-                                onClick={() => handleLevelTermSelect(null)}
-                                className={`w-full px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${
-                                  selectedLevelTermFilter === null
-                                    ? 'bg-yellow-400 text-teal-900 shadow'
-                                    : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50'
-                                }`}
-                            >
-                                All
-                            </button>
-                            <button
-                                onClick={() => handleLevelTermSelect('N/A')}
-                                className={`w-full px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${
-                                  selectedLevelTermFilter === 'N/A'
-                                    ? 'bg-yellow-400 text-teal-900 shadow'
-                                    : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50'
-                                }`}
-                            >
-                                N/A
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1">
-                            {levelTermGrid.flat().map(term => (
-                                <button
-                                    key={term}
-                                    onClick={() => handleLevelTermSelect(term)}
-                                    className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${
-                                      selectedLevelTermFilter === term
-                                        ? 'bg-yellow-400 text-teal-900 shadow'
-                                        : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50'
-                                    }`}
-                                >
-                                    {term.replace('T', '-T')}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-              )}
-
-              {/* Filter by Section */}
-              <div>
-                  {selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A' && sectionFilterOptions.length > 0 && (
-                    <div>
-                      <h4 className="text-[10px] text-teal-200 mb-1 font-semibold">Filter by Section</h4>
-                      <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar pr-1">
-                        <button
-                          onClick={() => setSelectedSectionFilter(null)}
-                          className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${
-                            selectedSectionFilter === null
-                              ? 'bg-yellow-400 text-teal-900 shadow'
-                              : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50'
-                          }`}
-                        >
-                          All
-                        </button>
-                        {sectionFilterOptions.map(section => (
-                          <button
-                            key={section}
-                            onClick={() => setSelectedSectionFilter(section)}
-                            className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${
-                              selectedSectionFilter === section
-                                ? 'bg-yellow-400 text-teal-900 shadow'
-                                : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50'
-                            }`}
-                          >
-                            {section}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-              </div>
-              
-              {/* Unified Preview Button */}
-              <div className="border-t border-teal-800/50 pt-3 mt-1">
-                <button
-                  onClick={handlePreviewClick}
-                  disabled={isPreviewDisabled}
-                  className="w-full flex items-center justify-center gap-2 p-2 text-sm font-semibold text-teal-800 bg-yellow-400 rounded-md shadow-md transition-all enabled:hover:bg-yellow-300 disabled:bg-teal-800 disabled:text-teal-500 disabled:cursor-not-allowed"
-                  title={previewTitle}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>Preview Routine</span>
-                </button>
-              </div>
-
-            </div>
-          )}
-      </div>
-  );
-
+  
   const footerContent = (
-      <div 
-        className="
-          bg-[var(--color-primary-800)] p-2 flex justify-around items-center w-full
-        "
-      >
-          <button onClick={() => onOverlayToggle('settings')} className={getFooterIconClasses(currentOverlay, 'settings')} aria-label="Settings" aria-pressed={currentOverlay === 'settings'}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426-1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Settings</span>
-          </button>
-          {user?.role === 'admin' && (
-              <button onClick={() => onOverlayToggle('userManagement')} className={getFooterIconClasses(currentOverlay, 'userManagement')} aria-label="User Management" aria-pressed={currentOverlay === 'userManagement'}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm-9 3a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Users</span>
-              </button>
-          )}
-          <button onClick={() => onOverlayToggle('notifications')} className={getFooterIconClasses(currentOverlay, 'notifications')} aria-label="Notifications" aria-pressed={currentOverlay === 'notifications'}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-             {((user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0) || (user?.notificationAccess?.canGetNotification && unreadNotificationCount > 0)) && (
-                <div className="absolute top-0 right-0 -mt-1.5 -mr-1.5 flex items-center">
-                    {user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0 && (
-                        <span className="flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-400 text-black text-[9px] font-bold ring-2 ring-[var(--color-primary-800)]" title={`${pendingRequestCount} pending requests`}>
-                            {pendingRequestCount}
-                        </span>
-                    )}
-                    {user?.notificationAccess?.canGetNotification && unreadNotificationCount > 0 && (
-                        <span className={`flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold ring-2 ring-[var(--color-primary-800)] ${user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0 ? '-ml-1.5' : ''}`} title={`${unreadNotificationCount} unread notifications`}>
-                            {unreadNotificationCount}
-                        </span>
-                    )}
-                </div>
-             )}
-            <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Notify</span>
-          </button>
-          <button onClick={logout} className="group relative flex flex-col items-center p-1 text-[var(--color-primary-200)] hover:text-red-400" aria-label="Logout">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Logout</span>
-          </button>
+      <div className="bg-[var(--color-primary-800)] p-2 flex justify-around items-center w-full">
+          <button onClick={() => onOverlayToggle('settings')} className={getFooterIconClasses(currentOverlay, 'settings')} aria-label="Settings" aria-pressed={currentOverlay === 'settings'}><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426-1.756-2.924-1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0 3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg><span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Settings</span></button>
+          {user?.role === 'admin' && (<button onClick={() => onOverlayToggle('userManagement')} className={getFooterIconClasses(currentOverlay, 'userManagement')} aria-label="User Management" aria-pressed={currentOverlay === 'userManagement'}><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm-9 3a2 2 0 11-4 0 2 2 0 014 0z" /></svg><span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Users</span></button>)}
+          <button onClick={() => onOverlayToggle('notifications')} className={getFooterIconClasses(currentOverlay, 'notifications')} aria-label="Notifications" aria-pressed={currentOverlay === 'notifications'}><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>{((user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0) || (user?.notificationAccess?.canGetNotification && unreadNotificationCount > 0)) && (<div className="absolute top-0 right-0 -mt-1.5 -mr-1.5 flex items-center">{user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0 && (<span className="flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-amber-400 text-black text-[9px] font-bold ring-2 ring-[var(--color-primary-800)]" title={`${pendingRequestCount} pending requests`}>{pendingRequestCount}</span>)}{user?.notificationAccess?.canGetNotification && unreadNotificationCount > 0 && (<span className={`flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold ring-2 ring-[var(--color-primary-800)] ${user?.notificationAccess?.canApproveSlots && pendingRequestCount > 0 ? '-ml-1.5' : ''}`} title={`${unreadNotificationCount} unread notifications`}>{unreadNotificationCount}</span>)}</div>)}<span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Notify</span></button>
+          <button onClick={logout} className="group relative flex flex-col items-center p-1 text-[var(--color-primary-200)] hover:text-red-400" aria-label="Logout"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg><span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-1.5 opacity-0 group-hover:opacity-100 bg-gray-700 text-white text-xs px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap transition-opacity duration-200 pointer-events-none">Logout</span></button>
       </div>
   );
-
 
   return (
     <div className={`${SHARED_SIDE_PANEL_WIDTH_CLASSES} h-full relative flex-shrink-0`}>
@@ -1289,143 +1043,82 @@ const Sidebar: React.FC<SidebarProps> = React.memo(({
         )}
 
         <div className="flex-shrink-0 space-y-1.5 px-2 sm:px-2.5 pt-2"> 
-
           <div className="flex gap-2 sm:gap-2">
-            <div className="flex-1 min-w-0">
-              {semesterDropdownItemsForSearchable.length > 0 ? (
-                <SearchableProgramDropdown
-                  programs={semesterDropdownItemsForSearchable}
-                  selectedProgramId={selectedSemesterIdForRoutineView}
-                  onProgramSelect={handleSemesterQuickViewSelect}
-                  placeholderText={"Select a Semester"}
-                  icon={<SemesterDropdownIcon />}
-                  buttonClassName={semesterDropdownButtonClass}
-                  showAllProgramsListItem={false}
-                />
-              ) : (
-                <div className={`${semesterDropdownButtonClass} opacity-75 cursor-not-allowed`}>No semesters found.</div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              {programsLoading ? (
-                <div className={`${programDropdownButtonClass} opacity-75`}>Loading...</div>
-              ) : programs.length > 0 ? (
-                <SearchableProgramDropdown
-                  programs={programs}
-                  selectedProgramId={selectedProgramIdForRoutineView}
-                  onProgramSelect={handleProgramQuickViewSelect}
-                  placeholderText={allProgramsListItemText} 
-                  icon={<ProgramDropdownIcon />}
-                  buttonClassName={programDropdownButtonClass}
-                  showAllProgramsListItem={true}
-                  allProgramsListItemText={allProgramsListItemText} 
-                />
-              ) : (
-                <div className={`${programDropdownButtonClass} opacity-75 cursor-not-allowed`}>No programs.</div>
-              )}
-            </div>
+            <div className="flex-1 min-w-0">{semesterDropdownItemsForSearchable.length > 0 ? (<SearchableProgramDropdown programs={semesterDropdownItemsForSearchable} selectedProgramId={selectedSemesterIdForRoutineView} onProgramSelect={handleSemesterQuickViewSelect} placeholderText={"Select a Semester"} icon={<SemesterDropdownIcon />} buttonClassName={semesterDropdownButtonClass} showAllProgramsListItem={false}/>) : (<div className={`${semesterDropdownButtonClass} opacity-75 cursor-not-allowed`}>No semesters found.</div>)}</div>
+            <div className="flex-1 min-w-0">{programsLoading ? (<div className={`${programDropdownButtonClass} opacity-75`}>Loading...</div>) : programs.length > 0 ? (<SearchableProgramDropdown programs={programs} selectedProgramId={selectedProgramIdForRoutineView} onProgramSelect={handleProgramQuickViewSelect} placeholderText={allProgramsListItemText} icon={<ProgramDropdownIcon />} buttonClassName={programDropdownButtonClass} showAllProgramsListItem={true} allProgramsListItemText={allProgramsListItemText}/>) : (<div className={`${programDropdownButtonClass} opacity-75 cursor-not-allowed`}>No programs.</div>)}</div>
           </div>
-          
           <div className={`mt-1.5 flex gap-2 sm:gap-2`}>
-            <div className="flex-1">
-              <p className={roomFilterTitleClasses}>Assigned Rooms</p>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <button
-                  onClick={() => handleAssignedRoomTypeFilterClick('Theory')}
-                  className={`${roomFilterButtonBaseClasses} flex-1 
-                    ${activeAssignedRoomTypeFilter === 'Theory' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}
-                  `}
-                  aria-pressed={activeAssignedRoomTypeFilter === 'Theory'}
-                >
-                  Theory
-                </button>
-                <button
-                  onClick={() => handleAssignedRoomTypeFilterClick('Lab')}
-                  className={`${roomFilterButtonBaseClasses} flex-1 
-                    ${activeAssignedRoomTypeFilter === 'Lab' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}
-                  `}
-                  aria-pressed={activeAssignedRoomTypeFilter === 'Lab'}
-                >
-                  Lab
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1">
-              <p className={roomFilterTitleClasses}>Shared Rooms</p>
-              <div className="flex items-center gap-1 sm:gap-1.5">
-                <button
-                  onClick={() => handleSharedRoomTypeFilterClick('Theory')}
-                  className={`${roomFilterButtonBaseClasses} flex-1 
-                    ${activeSharedRoomTypeFilter === 'Theory' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}
-                  `}
-                  aria-pressed={activeSharedRoomTypeFilter === 'Theory'}
-                >
-                  Theory
-                </button>
-                <button
-                  onClick={() => handleSharedRoomTypeFilterClick('Lab')}
-                  className={`${roomFilterButtonBaseClasses} flex-1 
-                    ${activeSharedRoomTypeFilter === 'Lab' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}
-                  `}
-                  aria-pressed={activeSharedRoomTypeFilter === 'Lab'}
-                >
-                  Lab
-                </button>
-              </div>
-            </div>
+            <div className="flex-1"><p className={roomFilterTitleClasses}>Assigned Rooms</p><div className="flex items-center gap-1 sm:gap-1.5"><button onClick={() => handleAssignedRoomTypeFilterClick('Theory')} className={`${roomFilterButtonBaseClasses} flex-1 ${activeAssignedRoomTypeFilter === 'Theory' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}`} aria-pressed={activeAssignedRoomTypeFilter === 'Theory'}>Theory</button><button onClick={() => handleAssignedRoomTypeFilterClick('Lab')} className={`${roomFilterButtonBaseClasses} flex-1 ${activeAssignedRoomTypeFilter === 'Lab' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}`} aria-pressed={activeAssignedRoomTypeFilter === 'Lab'}>Lab</button></div></div>
+            <div className="flex-1"><p className={roomFilterTitleClasses}>Shared Rooms</p><div className="flex items-center gap-1 sm:gap-1.5"><button onClick={() => handleSharedRoomTypeFilterClick('Theory')} className={`${roomFilterButtonBaseClasses} flex-1 ${activeSharedRoomTypeFilter === 'Theory' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}`} aria-pressed={activeSharedRoomTypeFilter === 'Theory'}>Theory</button><button onClick={() => handleSharedRoomTypeFilterClick('Lab')} className={`${roomFilterButtonBaseClasses} flex-1 ${activeSharedRoomTypeFilter === 'Lab' ? 'bg-[var(--color-accent-yellow-400)] text-[var(--color-primary-800)] border-[var(--color-accent-yellow-500)]' : 'bg-[var(--color-primary-800)] text-[var(--color-primary-100)] hover:bg-[var(--color-primary-700)] hover:text-[var(--color-accent-yellow-300)] border-[var(--color-primary-600)]'}`} aria-pressed={activeSharedRoomTypeFilter === 'Lab'}>Lab</button></div></div>
           </div>
         </div>
-
-        {user?.dashboardAccess?.canViewSlotUsage && (
-          <div className="flex-shrink-0 mt-2 px-2 sm:px-2.5 space-y-1">
-              <div className="flex justify-between items-baseline">
-                  <p className="text-xs font-semibold text-teal-200">Slot Usage</p>
-                  <p className="text-xs font-bold text-white">{slotUsageStats.booked} / {slotUsageStats.total}</p>
-              </div>
-              <div className="w-full bg-teal-900 rounded-full h-2 border border-teal-800">
-                  <div 
-                      className="bg-yellow-400 h-full rounded-full transition-all duration-500 ease-out" 
-                      style={{ width: `${slotUsageStats.total > 0 ? (slotUsageStats.booked / slotUsageStats.total) * 100 : 0}%` }}
-                  ></div>
-              </div>
-          </div>
-        )}
 
         <div className="flex-grow flex flex-col min-h-0 overflow-y-auto no-scrollbar px-2 sm:px-2.5 pb-2">
             {selectedSemesterIdForRoutineView === null ? (
               <div className="h-full flex flex-col items-center justify-center p-4 text-center text-teal-200 bg-teal-800/50 rounded-md mt-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <p className="font-semibold text-sm">Dashboard is Unavailable</p>
-                <p className="text-xs mt-1">
-                  Please select a specific semester from the dropdown above to view dashboard statistics and filters.
-                </p>
+                <p className="text-xs mt-1">Please select a semester to view dashboard and filters.</p>
               </div>
-            ) : showSlotRequirements ? (
-              <SlotRequirementTable 
-                courses={coursesForSlotRequirementView}
-                ciwCounts={ciwCounts}
-                classRequirementCounts={classRequirementCounts}
-                onClose={() => setShowSlotRequirements(false)}
-                activeTab={dashboardTabFilter}
-                onTabChange={setDashboardTabFilter}
-                onBulkAssign={onBulkAssign}
-                isBulkAssignDisabled={isBulkAssignDisabled}
-                bulkAssignTooltip={bulkAssignTooltip}
-                versions={versions || []}
-                activeVersionId={activeVersionId || null}
-                onVersionChange={onVersionChange || (() => {})}
-                onDeleteVersion={onDeleteVersion || (() => {})}
-                onEditSection={setEditingSection}
-                editingSectionId={editingSection?.sectionId ?? null}
-                canEdit={canEditCourseSectionDetails}
-                setRoutineData={setRoutineData}
-                selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-              />
             ) : (
-              statsDashboard
+                <>
+                    <RoutineFiltersAndPreview
+                        user={user}
+                        coursesData={coursesData}
+                        selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
+                        selectedProgramIdForRoutineView={selectedProgramIdForRoutineView}
+                        programs={programs}
+                        handleTeacherSelect={handleTeacherSelect}
+                        selectedTeacherIdFilter={selectedTeacherIdFilter}
+                        handleCourseSectionSelect={handleCourseSectionSelect}
+                        selectedCourseSectionIdsFilter={selectedCourseSectionIdsFilter}
+                        handleLevelTermSelect={handleLevelTermSelect}
+                        selectedLevelTermFilter={selectedLevelTermFilter}
+                        setSelectedSectionFilter={setSelectedSectionFilter}
+                        selectedSectionFilter={selectedSectionFilter}
+                        handlePreviewClick={onPreviewFullRoutine}
+                        isPreviewDisabled={isPreviewDisabled}
+                        previewTitle={previewTitle}
+                    />
+                    {routineDisplayMode === 'editable' && (
+                        showSlotRequirements ? (
+                            <SlotRequirementTable 
+                                courses={coursesForSlotRequirementView} ciwCounts={ciwCounts} classRequirementCounts={classRequirementCounts}
+                                onClose={() => setShowSlotRequirements(false)} activeTab={dashboardTabFilter} onTabChange={setDashboardTabFilter}
+                                onBulkAssign={onBulkAssign} isBulkAssignDisabled={isBulkAssignDisabled} bulkAssignTooltip={bulkAssignTooltip}
+                                versions={versions || []} activeVersionId={activeVersionId || null}
+                                onVersionChange={onVersionChange || (() => {})} onDeleteVersion={onDeleteVersion || (() => {})}
+                                onEditSection={setEditingSection} editingSectionId={editingSection?.sectionId ?? null}
+                                canEdit={canEditCourseSectionDetails} setRoutineData={setRoutineData}
+                                selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
+                            />
+                        ) : (
+                            <div className="mt-3 space-y-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <button onClick={onToggleRoutineViewMode} disabled={selectedProgramIdForRoutineView === null || routineDisplayMode === 'published'} className="flex items-center gap-2 text-xs font-semibold text-teal-200 hover:text-yellow-300 transition-colors focus:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed" title={routineDisplayMode === 'published' ? "Day-centric view is disabled in Published mode" : selectedProgramIdForRoutineView === null ? "Select a program to change view mode" : routineViewMode === 'roomCentric' ? 'Switch to Day-Centric View' : 'Switch to Room-Centric View'}>
+                                        {routineViewMode === 'roomCentric' ? (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>) : (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>)}
+                                        Dashboard
+                                    </button>
+                                    <div className="flex items-center gap-1.5">{(user?.dashboardAccess?.canImportCourseData || user?.dashboardAccess?.canExportCourseData) && (<CourseDataTools coursesData={coursesData} setCoursesData={setCoursesData} dataToDownload={filteredCoursesForDownload} buttonStyle='sidebar' canImport={!!user.dashboardAccess.canImportCourseData} canExport={!!user.dashboardAccess.canExportCourseData}/>)}</div>
+                                </div>
+                                <div className="flex gap-1 p-1 bg-teal-900 rounded-md">
+                                    {(['All', 'Theory', 'Lab'] as const).map(tab => (<button key={tab} onClick={() => setDashboardTabFilter(tab)} className={`w-full text-center text-xs font-bold py-1.5 rounded-sm transition-all duration-200 ${dashboardTabFilter === tab ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 hover:bg-teal-700/50'}`}>{tab}</button>))}
+                                </div>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <StatCard title="Courses" value={sidebarStats.uniqueCourseCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>} onClick={() => handleDashboardCardClick('courseList')} isActive={currentMainView === 'courseList'} disabled={!user?.dashboardAccess?.canViewCourseList} />
+                                    <StatCard title="Sections" value={sidebarStats.sectionCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>} onClick={() => handleDashboardCardClick('sectionList')} isActive={currentMainView === 'sectionList'} disabled={!user?.dashboardAccess?.canViewSectionList} />
+                                    <StatCard title="Rooms" value={sidebarStats.roomCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>} onClick={() => handleDashboardCardClick('roomList')} isActive={currentMainView === 'roomList'} disabled={!user?.dashboardAccess?.canViewRoomList} />
+                                    <StatCard title="Total Slots" value={sidebarStats.totalSlots} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>} disabled={!user?.dashboardAccess?.canViewTotalSlots} />
+                                    <StatCard title="Slot Requirement" value={`${sidebarStats.bookedSlotRequirement} / ${sidebarStats.slotRequirement}`} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5m-5 2a9 9 0 001.378 5.622M20 20v-5h-5m5 2a9 9 0 00-1.378-5.622" /></svg>} onClick={() => setShowSlotRequirements(true)} disabled={!user?.dashboardAccess?.canViewSlotRequirement}/>
+                                    <StatCard title="Slot Usage" value={`${sidebarStats.bookedSlots} / ${sidebarStats.totalSlots}`} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} onClick={onToggleRoutineViewMode} disabled={!user?.dashboardAccess?.canViewSlotUsage} />
+                                    <StatCard title="Teachers" value={sidebarStats.teacherCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm-9 3a2 2 0 11-4 0 2 2 0 014 0z" /></svg>} onClick={() => handleDashboardCardClick('teacherList')} isActive={currentMainView === 'teacherList'} disabled={!user?.dashboardAccess?.canViewTeacherList} />
+                                    <StatCard title="Make-up Schedule" value={sidebarStats.attendanceLogCount} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>} onClick={onShowAttendanceLog} isActive={currentMainView === 'attendanceLog'} disabled={!user?.dashboardAccess?.canViewMakeupSchedule} />
+                                </div>
+                                {user?.dashboardAccess?.canViewSlotUsage && (<div className="flex-shrink-0 mt-2 space-y-1"><div className="flex justify-between items-baseline"><p className="text-xs font-semibold text-teal-200">Slot Usage</p><p className="text-xs font-bold text-white">{slotUsageStats.booked} / {slotUsageStats.total}</p></div><div className="w-full bg-teal-900 rounded-full h-2 border border-teal-800"><div className="bg-yellow-400 h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${slotUsageStats.total > 0 ? (slotUsageStats.booked / slotUsageStats.total) * 100 : 0}%` }}></div></div></div>)}
+                            </div>
+                        )
+                    )}
+                </>
             )}
         </div>
       </aside>

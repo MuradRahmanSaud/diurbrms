@@ -1,5 +1,3 @@
-
-
 import React, { lazy, Suspense, useMemo, useState, useEffect, useCallback } from 'react';
 import { ProgramProvider } from './contexts/ProgramContext'; 
 import { BuildingProvider } from './contexts/BuildingContext'; 
@@ -18,10 +16,10 @@ import ConflictResolutionModal from './components/modals/ConflictResolutionModal
 import Modal from './components/Modal';
 import { useAppLogic } from './hooks/useAppLogic';
 import { useModalManager } from './hooks/useModalManager';
-import { generateTeacherRoutinePDF } from './utils/pdfGenerator';
+import { generateTeacherRoutinePDF, generateLevelTermRoutinePDF, generateFullRoutinePDF, generateCourseSectionRoutinePDF } from './utils/pdfGenerator';
 import { SHARED_SIDE_PANEL_WIDTH_CLASSES, SIDEBAR_FOOTER_HEIGHT_PX } from './styles/layoutConstants'; 
 import RoutineGrid from './components/RoutineGrid';
-import { DefaultTimeSlot, FullRoutineData, RoomEntry, SemesterRoutineData, User, PendingChange, Notification, ClassDetail } from './types';
+import { DefaultTimeSlot, FullRoutineData, RoomEntry, SemesterRoutineData, User, PendingChange, Notification, ClassDetail, RoutineVersion, DayOfWeek, TimeSlot } from './types';
 import LogAttendanceModal from './components/modals/LogAttendanceModal';
 
 // Lazy load components
@@ -72,6 +70,9 @@ const LoadingSpinner: React.FC = () => (
 
 
 const AppContent: React.FC = () => {
+  const [routineDisplayMode, setRoutineDisplayMode] = useState<'published' | 'editable'>('editable');
+  const [isPublishConfirmModalOpen, setIsPublishConfirmModalOpen] = useState(false);
+
   const {
       // State & Setters
       user, logout, users,
@@ -136,14 +137,11 @@ const AppContent: React.FC = () => {
       gridMessageDetails,
       effectiveHeaderSlotsForGrid,
       effectiveRoomEntriesForGrid,
-      routineDataForGrid,
+      routineDataForGrid: originalRoutineDataForGrid, // Renamed to avoid conflict
       coursesForCourseListView,
       coursesForSectionListView,
       teachersForTeacherListView,
       roomsForRoomListView,
-      handlePreviewLevelTermRoutine,
-      handlePreviewFullRoutine,
-      handlePreviewCourseSectionRoutine,
       handleBulkAssign,
       markNotificationAsRead,
       markAllNotificationsAsRead,
@@ -188,6 +186,144 @@ const AppContent: React.FC = () => {
       handleCloseSlotDetailModal,
   } = useModalManager({ allRooms });
 
+  // Automatically switch to room-centric view when in published mode.
+  useEffect(() => {
+    if (routineDisplayMode === 'published' && routineViewMode === 'dayCentric') {
+        handleToggleRoutineViewMode();
+    }
+  }, [routineDisplayMode, routineViewMode, handleToggleRoutineViewMode]);
+
+  // Enforce routine display mode based on user permissions
+  useEffect(() => {
+    if (user?.dashboardAccess) {
+        const canViewEditable = user.dashboardAccess.canViewEditableRoutine ?? false;
+        const canViewPublished = user.dashboardAccess.canViewPublishedRoutine ?? false;
+
+        // If user is in a mode they can't view, switch them
+        if (routineDisplayMode === 'editable' && !canViewEditable) {
+            if (canViewPublished) {
+                setRoutineDisplayMode('published');
+            }
+        } else if (routineDisplayMode === 'published' && !canViewPublished) {
+            if (canViewEditable) {
+                setRoutineDisplayMode('editable');
+            }
+        }
+    }
+  }, [user, routineDisplayMode]);
+
+  const isEditable = routineDisplayMode === 'editable';
+
+  const handleOpenPublishConfirmModal = useCallback(() => {
+    setIsPublishConfirmModalOpen(true);
+  }, []);
+
+  const handleClosePublishConfirmModal = useCallback(() => {
+    setIsPublishConfirmModalOpen(false);
+  }, []);
+
+  const handlePublishRoutine = useCallback(() => {
+    if (!selectedSemesterIdForRoutineView || !activeProgramIdInSidebar) {
+        console.error("Attempted to publish without a selected semester or program.");
+        return;
+    }
+    const program = allPrograms.find(p => p.id === activeProgramIdInSidebar);
+    if (!program) {
+        console.error("Selected program not found.");
+        return;
+    }
+    const programPId = program.pId;
+
+    setRoutineData(prev => {
+        const newData = JSON.parse(JSON.stringify(prev));
+        const semesterData: SemesterRoutineData = newData[selectedSemesterIdForRoutineView];
+
+        if (!semesterData || !semesterData.activeVersionId) {
+            alert("Cannot publish: No active routine found for this semester to publish.");
+            return prev;
+        }
+
+        const activeVersion = semesterData.versions.find((v: RoutineVersion) => v.versionId === semesterData.activeVersionId);
+        if (!activeVersion) {
+            alert("Cannot publish: Active routine version data is corrupted or missing.");
+            return prev;
+        }
+
+        const publishedVersion = semesterData.publishedVersionId 
+            ? semesterData.versions.find((v: RoutineVersion) => v.versionId === semesterData.publishedVersionId) 
+            : null;
+
+        const newPublishedRoutine: FullRoutineData = publishedVersion ? JSON.parse(JSON.stringify(publishedVersion.routine)) : {};
+
+        // Remove existing classes for the target program from the published routine
+        for (const day of Object.keys(newPublishedRoutine) as DayOfWeek[]) {
+            const dayData = newPublishedRoutine[day];
+            if (!dayData) continue;
+            for (const room of Object.keys(dayData)) {
+                for (const slot of Object.keys(dayData[room]) as TimeSlot[]) {
+                    if (dayData[room][slot]?.pId === programPId) {
+                        delete dayData[room][slot];
+                    }
+                }
+                if (Object.keys(dayData[room]).length === 0) {
+                    delete newPublishedRoutine[day]![room];
+                }
+            }
+            if (Object.keys(newPublishedRoutine[day]!).length === 0) {
+                delete newPublishedRoutine[day];
+            }
+        }
+        
+        // Add new classes for the target program from the active routine
+        const activeRoutine = activeVersion.routine;
+        for (const day of Object.keys(activeRoutine) as DayOfWeek[]) {
+            const dayData = activeRoutine[day];
+            if (!dayData) continue;
+            for (const room of Object.keys(dayData)) {
+                for (const slot of Object.keys(dayData[room]) as TimeSlot[]) {
+                    if (dayData[room][slot]?.pId === programPId) {
+                        if (!newPublishedRoutine[day]) newPublishedRoutine[day] = {};
+                        if (!newPublishedRoutine[day]![room]) newPublishedRoutine[day]![room] = {};
+                        newPublishedRoutine[day]![room][slot] = dayData[room][slot];
+                    }
+                }
+            }
+        }
+
+        const newPublishedVersionId = `published-${Date.now()}`;
+        const newPublishedVersion: RoutineVersion = {
+            versionId: newPublishedVersionId,
+            createdAt: new Date().toISOString(),
+            routine: newPublishedRoutine,
+        };
+        
+        // Remove old published versions
+        semesterData.versions = semesterData.versions.filter((v: RoutineVersion) => !v.versionId.startsWith('published-'));
+
+        semesterData.versions.unshift(newPublishedVersion);
+        semesterData.publishedVersionId = newPublishedVersionId;
+        
+        semesterData.versions.sort((a: RoutineVersion, b: RoutineVersion) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        newData[selectedSemesterIdForRoutineView] = semesterData;
+        return newData;
+    });
+  }, [selectedSemesterIdForRoutineView, activeProgramIdInSidebar, setRoutineData, allPrograms]);
+
+  const handleConfirmPublish = useCallback(() => {
+    handlePublishRoutine();
+    handleClosePublishConfirmModal();
+  }, [handlePublishRoutine, handleClosePublishConfirmModal]);
+
+  const isPublishable = useMemo(() => {
+    if (!user?.dashboardAccess?.canPublishRoutine) return false;
+    if (!selectedSemesterIdForRoutineView || !activeProgramIdInSidebar) return false;
+    const semesterData = routineData[selectedSemesterIdForRoutineView];
+    if (!semesterData || !semesterData.activeVersionId) return false;
+    const activeVersion = semesterData.versions.find(v => v.versionId === semesterData.activeVersionId);
+    return !!activeVersion;
+  }, [user, selectedSemesterIdForRoutineView, routineData, activeProgramIdInSidebar]);
+
   const activeRoutinesBySemester = useMemo(() => {
     const result: { [semesterId: string]: FullRoutineData } = {};
     for (const semesterId in routineData) {
@@ -201,6 +337,31 @@ const AppContent: React.FC = () => {
     }
     return result;
   }, [routineData]);
+  
+  const publishedRoutinesBySemester = useMemo(() => {
+    const result: { [semesterId: string]: FullRoutineData } = {};
+    for (const semesterId in routineData) {
+        const semesterData = routineData[semesterId];
+        if (semesterData && semesterData.publishedVersionId) {
+            const publishedVersion = semesterData.versions.find(v => v.versionId === semesterData.publishedVersionId);
+            result[semesterId] = publishedVersion ? publishedVersion.routine : {};
+        } else {
+            result[semesterId] = {};
+        }
+    }
+    return result;
+  }, [routineData]);
+  
+  const routineDataForGrid = useMemo(() => {
+    if (!selectedSemesterIdForRoutineView) return {};
+    const routines = routineDisplayMode === 'editable' ? activeRoutinesBySemester : publishedRoutinesBySemester;
+    return routines[selectedSemesterIdForRoutineView] || {};
+  }, [routineDisplayMode, activeRoutinesBySemester, publishedRoutinesBySemester, selectedSemesterIdForRoutineView]);
+
+  const routineDataForPreview = useMemo(() => {
+    return routineDisplayMode === 'editable' ? activeRoutinesBySemester : publishedRoutinesBySemester;
+  }, [routineDisplayMode, activeRoutinesBySemester, publishedRoutinesBySemester]);
+
 
   const handleApproveChange = useCallback((changeId: string, datesToApprove?: string[]) => {
     const change = pendingChanges.find(c => c.id === changeId);
@@ -318,18 +479,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handlePreviewTeacherRoutine = () => {
-    generateTeacherRoutinePDF({
-        teacherId: selectedTeacherIdFilter,
-        semesterId: selectedSemesterIdForRoutineView,
-        coursesData,
-        routineData: activeRoutinesBySemester,
-        allPrograms,
-        systemDefaultTimeSlots,
-        allUsers: users,
-    });
-  };
-
   const floorsForGridModal = useMemo(() => {
     if (selectedRoomForGridModal?.buildingId) {
       return allFloors.filter(f => f.buildingId === selectedRoomForGridModal.buildingId);
@@ -370,6 +519,78 @@ const AppContent: React.FC = () => {
     actualActiveSharedFilter
   ]);
   
+    const handlePreviewTeacherRoutine = useCallback(() => {
+        generateTeacherRoutinePDF({
+            teacherId: selectedTeacherIdFilter,
+            semesterId: selectedSemesterIdForRoutineView,
+            coursesData,
+            routineData: routineDataForPreview,
+            allPrograms,
+            systemDefaultTimeSlots,
+            allUsers: users,
+        });
+    }, [selectedTeacherIdFilter, selectedSemesterIdForRoutineView, coursesData, routineDataForPreview, allPrograms, systemDefaultTimeSlots, users]);
+
+    const handlePreviewLevelTermRoutine = useCallback(() => {
+        if (!selectedLevelTermFilter || selectedLevelTermFilter === 'N/A') {
+            alert("Please select a valid Level-Term to generate a routine.");
+            return;
+        }
+        if (!selectedSemesterIdForRoutineView) {
+            alert("Please select a semester.");
+            return;
+        }
+        generateLevelTermRoutinePDF({
+            levelTerm: selectedLevelTermFilter,
+            section: selectedSectionFilter,
+            semesterId: selectedSemesterIdForRoutineView,
+            programId: activeProgramIdInSidebar,
+            routineData: routineDataForPreview,
+            allPrograms,
+            systemDefaultTimeSlots,
+            coursesData
+        });
+    }, [selectedLevelTermFilter, selectedSectionFilter, selectedSemesterIdForRoutineView, activeProgramIdInSidebar, routineDataForPreview, allPrograms, systemDefaultTimeSlots, coursesData]);
+
+    const handlePreviewFullRoutine = useCallback(() => {
+        if (!activeProgramIdInSidebar || !selectedSemesterIdForRoutineView) {
+            alert("Please select a program and a semester first.");
+            return;
+        }
+        const semesterRoutineData = routineDataForPreview[selectedSemesterIdForRoutineView] || {};
+        generateFullRoutinePDF({
+            programId: activeProgramIdInSidebar,
+            semesterId: selectedSemesterIdForRoutineView,
+            routineData: semesterRoutineData,
+            allPrograms,
+            allRooms,
+            allRoomTypes,
+            systemDefaultTimeSlots,
+            getBuildingName: getBuildingNameFromApp,
+        });
+    }, [activeProgramIdInSidebar, selectedSemesterIdForRoutineView, routineDataForPreview, allPrograms, allRooms, allRoomTypes, systemDefaultTimeSlots, getBuildingNameFromApp]);
+
+    const handlePreviewCourseSectionRoutine = useCallback(() => {
+        if (!selectedSemesterIdForRoutineView) {
+            alert("Please select a semester.");
+            return;
+        }
+        if (selectedCourseSectionIdsFilter.length === 0) {
+            alert("Please select at least one course section to generate a routine.");
+            return;
+        }
+        generateCourseSectionRoutinePDF({
+            sectionIds: selectedCourseSectionIdsFilter,
+            semesterId: selectedSemesterIdForRoutineView,
+            programId: activeProgramIdInSidebar,
+            routineData: routineDataForPreview,
+            coursesData,
+            allPrograms,
+            systemDefaultTimeSlots,
+        });
+    }, [selectedCourseSectionIdsFilter, selectedSemesterIdForRoutineView, activeProgramIdInSidebar, routineDataForPreview, coursesData, allPrograms, systemDefaultTimeSlots]);
+
+
   const headerHeight = '48px'; 
 
   let panelContent: JSX.Element | null = null;
@@ -456,6 +677,10 @@ const AppContent: React.FC = () => {
         logout={logout}
         onChangePassword={handleChangePassword}
         onShowUserDetail={handleShowUserDetail}
+        routineDisplayMode={routineDisplayMode}
+        onRoutineDisplayModeChange={setRoutineDisplayMode}
+        onPublish={handleOpenPublishConfirmModal}
+        isPublishable={isPublishable}
       />
       <div className="flex flex-row flex-grow overflow-hidden" style={{ height: `calc(100vh - ${headerHeight})` }}>
         <Sidebar 
@@ -488,6 +713,7 @@ const AppContent: React.FC = () => {
           setCoursesData={setCoursesData}
           routineViewMode={routineViewMode}
           onToggleRoutineViewMode={handleToggleRoutineViewMode}
+          routineDisplayMode={routineDisplayMode}
           selectedLevelTermFilter={selectedLevelTermFilter}
           setSelectedLevelTermFilter={setSelectedLevelTermFilter}
           selectedSectionFilter={selectedSectionFilter}
@@ -559,6 +785,7 @@ const AppContent: React.FC = () => {
                         selectedCourseSectionIdsFilter={selectedCourseSectionIdsFilter}
                         onLogAttendance={handleOpenLogAttendanceModal}
                         onOpenConflictModal={handleOpenConflictModal}
+                        isEditable={isEditable}
                       />
                     </div>
                   ) : (
@@ -796,6 +1023,7 @@ const AppContent: React.FC = () => {
                         activeProgramIdInSidebar={activeProgramIdInSidebar}
                         selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
                         pendingChanges={pendingChanges}
+                        isEditable={isEditable}
                     />
                 </div>
               </>
@@ -893,6 +1121,36 @@ const AppContent: React.FC = () => {
           fullRoutineForDay={routineDataForGrid[conflictDataForModal.day] || {}}
           semesterId={selectedSemesterIdForRoutineView}
         />
+      )}
+
+      {isPublishConfirmModalOpen && (
+        <Modal
+            isOpen={isPublishConfirmModalOpen}
+            onClose={handleClosePublishConfirmModal}
+            title={`Publish for ${allPrograms.find(p => p.id === activeProgramIdInSidebar)?.shortName}`}
+            subTitle={`This will update the published routine for semester: ${selectedSemesterIdForRoutineView}`}
+            footerContent={
+                <div className="flex justify-end gap-2">
+                    <button onClick={handleClosePublishConfirmModal} className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md">
+                        Cancel
+                    </button>
+                    <button onClick={handleConfirmPublish} className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-md">
+                        Yes, Publish
+                    </button>
+                </div>
+            }
+            maxWidthClass="max-w-md"
+        >
+            <div className="p-4 text-sm text-gray-600 space-y-2">
+                <p>
+                    Are you sure you want to publish the current <span className="font-semibold text-gray-800">editable</span> routine for the selected program?
+                </p>
+                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md text-xs">
+                    <p className="font-semibold text-yellow-800">This action will ONLY update classes for the <span className="font-bold">{allPrograms.find(p => p.id === activeProgramIdInSidebar)?.shortName}</span> program.</p>
+                    <p className="mt-1 text-yellow-700">The published routine for all other programs will remain unchanged.</p>
+                </div>
+            </div>
+        </Modal>
       )}
     </div>
   );
