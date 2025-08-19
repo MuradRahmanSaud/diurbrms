@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { DayOfWeek, FullRoutineData, DefaultTimeSlot, ProgramEntry, EnrollmentEntry, TimeSlot, RoomTypeEntry, RoomEntry, User } from '../types';
 import { DAYS_OF_WEEK } from '../data/routineConstants';
 import { sortSlotsByTypeThenTime } from '../data/slotConstants';
@@ -766,4 +767,107 @@ export const generateCourseSectionRoutinePDF = ({
     } else {
         alert("Please allow pop-ups for this website to preview the PDF.");
     }
+};
+
+interface ExcelGeneratorOptions {
+    routineData: FullRoutineData;
+    rooms: RoomEntry[];
+    timeSlots: DefaultTimeSlot[];
+    days: DayOfWeek[];
+    program: ProgramEntry | null;
+    semesterId: string;
+}
+
+export const generateRoutineExcel = ({
+    routineData,
+    rooms,
+    timeSlots,
+    days,
+    program,
+    semesterId,
+}: ExcelGeneratorOptions) => {
+    const wb = XLSX.utils.book_new();
+    const ws_data: (string | null)[][] = [];
+    const merges: XLSX.Range[] = [];
+    let currentRow = 0;
+
+    // Sort rooms by roomNumber to ensure consistent order
+    const sortedRooms = [...rooms].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true }));
+    const numTimeSlots = timeSlots.length;
+    const totalColumns = numTimeSlots * 3;
+
+    days.forEach(day => {
+        // Day Header Row
+        if (totalColumns > 0) {
+            const dayHeader = [day.toUpperCase()];
+            for (let i = 1; i < totalColumns; i++) {
+                dayHeader.push(null);
+            }
+            ws_data.push(dayHeader);
+            merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: totalColumns - 1 } });
+            currentRow++;
+        }
+
+        // Time Slot and Sub-header Rows
+        if (numTimeSlots > 0) {
+            const timeSlotHeader: (string | null)[] = [];
+            const subHeader: string[] = [];
+            timeSlots.forEach((slot, i) => {
+                timeSlotHeader.push(formatDefaultSlotToString(slot));
+                timeSlotHeader.push(null, null); // For merging
+                merges.push({ s: { r: currentRow, c: i * 3 }, e: { r: currentRow, c: i * 3 + 2 } });
+                
+                subHeader.push('Room', 'Course', 'Teacher');
+            });
+            ws_data.push(timeSlotHeader);
+            currentRow++;
+            ws_data.push(subHeader);
+            currentRow++;
+        }
+
+        // Data Rows
+        sortedRooms.forEach(room => {
+            const dataRow: string[] = [];
+            timeSlots.forEach(slot => {
+                const slotString = formatDefaultSlotToString(slot);
+                const classInfo = routineData[day]?.[room.roomNumber]?.[slotString];
+                
+                dataRow.push(room.roomNumber); // Room
+                if (classInfo) {
+                    dataRow.push(`${classInfo.courseCode}(${classInfo.section})`); // Course(Section)
+                    dataRow.push(classInfo.teacher); // Teacher Name
+                } else {
+                    dataRow.push('', ''); // Empty Course, Teacher
+                }
+            });
+            ws_data.push(dataRow);
+            currentRow++;
+        });
+
+        // Blank row for spacing
+        ws_data.push([]);
+        currentRow++;
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!merges'] = merges;
+    
+    // Set column widths for better readability
+    const colWidths = [];
+    for (let i = 0; i < numTimeSlots; i++) {
+        colWidths.push({ wch: 12 }); // Room
+        colWidths.push({ wch: 20 }); // Course
+        colWidths.push({ wch: 25 }); // Teacher
+    }
+    if (colWidths.length > 0) {
+        ws['!cols'] = colWidths;
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Class Routine');
+
+    const programName = program?.shortName.replace(/[^a-z0-9]/gi, '_') || 'Routine';
+    const semesterName = semesterId.replace(/[^a-z0-9]/gi, '_');
+
+    const fileName = `${programName}_${semesterName}.xlsx`;
+    XLSX.writeFile(wb, fileName);
 };

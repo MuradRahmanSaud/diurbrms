@@ -16,7 +16,7 @@ import ConflictResolutionModal from './components/modals/ConflictResolutionModal
 import Modal from './components/Modal';
 import { useAppLogic } from './hooks/useAppLogic';
 import { useModalManager } from './hooks/useModalManager';
-import { generateTeacherRoutinePDF, generateLevelTermRoutinePDF, generateFullRoutinePDF, generateCourseSectionRoutinePDF } from './utils/pdfGenerator';
+import { generateTeacherRoutinePDF, generateLevelTermRoutinePDF, generateFullRoutinePDF, generateCourseSectionRoutinePDF, generateRoutineExcel } from './utils/pdfGenerator';
 import { SHARED_SIDE_PANEL_WIDTH_CLASSES, SIDEBAR_FOOTER_HEIGHT_PX } from './styles/layoutConstants'; 
 import RoutineGrid from './components/RoutineGrid';
 import { DefaultTimeSlot, FullRoutineData, RoomEntry, SemesterRoutineData, User, PendingChange, Notification, ClassDetail, RoutineVersion, DayOfWeek, TimeSlot, PublishHistoryEntry } from './types';
@@ -689,6 +689,42 @@ const AppContent: React.FC = () => {
         });
     }, [selectedCourseSectionIdsFilter, selectedSemesterIdForRoutineView, activeProgramIdInSidebar, routineDataForPreview, coursesData, allPrograms, systemDefaultTimeSlots]);
 
+  const handleDownloadExcel = useCallback(() => {
+    if (!activeProgramIdInSidebar || !selectedSemesterIdForRoutineView) {
+        alert("Please select a program and a semester to download the Excel file.");
+        return;
+    }
+    const program = allPrograms.find(p => p.id === activeProgramIdInSidebar);
+    
+    generateRoutineExcel({
+        routineData: routineDataForGrid,
+        rooms: effectiveRoomEntriesForGrid,
+        timeSlots: effectiveHeaderSlotsForGrid,
+        days: effectiveDaysForGrid,
+        program: program || null,
+        semesterId: selectedSemesterIdForRoutineView,
+    });
+  }, [
+      activeProgramIdInSidebar,
+      selectedSemesterIdForRoutineView,
+      allPrograms,
+      routineDataForGrid,
+      effectiveRoomEntriesForGrid,
+      effectiveHeaderSlotsForGrid,
+      effectiveDaysForGrid,
+  ]);
+
+  const isExcelDownloadable = useMemo(() => {
+      return !!activeProgramIdInSidebar && !!selectedSemesterIdForRoutineView;
+  }, [activeProgramIdInSidebar, selectedSemesterIdForRoutineView]);
+
+  const excelDownloadTooltip = useMemo(() => {
+    if (!isExcelDownloadable) {
+        return "Select a program and a semester to download the routine.";
+    }
+    const program = allPrograms.find(p => p.id === activeProgramIdInSidebar);
+    return `Download routine for ${program?.shortName || 'selected program'} as an Excel file.`;
+  }, [isExcelDownloadable, allPrograms, activeProgramIdInSidebar]);
 
   const headerHeight = '48px'; 
 
@@ -781,6 +817,9 @@ const AppContent: React.FC = () => {
         onPublish={handleOpenPublishConfirmModal}
         isPublishable={isPublishable}
         lastPublishTimestamp={lastPublishTimestamp}
+        onDownloadExcel={handleDownloadExcel}
+        isExcelDownloadable={isExcelDownloadable}
+        excelDownloadTooltip={excelDownloadTooltip}
       />
       <div className="flex flex-row flex-grow overflow-hidden" style={{ height: `calc(100vh - ${headerHeight})` }}>
         <Sidebar 

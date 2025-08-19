@@ -18,12 +18,16 @@ interface HeaderProps {
   onPublish: () => void;
   isPublishable: boolean;
   lastPublishTimestamp: string | null;
+  onDownloadExcel: () => void;
+  isExcelDownloadable: boolean;
+  excelDownloadTooltip: string;
 }
 
 const Header: React.FC<HeaderProps> = React.memo(({
   days, selectedDay, onDaySelect, selectedDate, onDateChange,
   routineViewMode, user, logout, onChangePassword, onShowUserDetail,
-  routineDisplayMode, onRoutineDisplayModeChange, onPublish, isPublishable, lastPublishTimestamp
+  routineDisplayMode, onRoutineDisplayModeChange, onPublish, isPublishable, lastPublishTimestamp,
+  onDownloadExcel, isExcelDownloadable, excelDownloadTooltip
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
@@ -172,6 +176,19 @@ const Header: React.FC<HeaderProps> = React.memo(({
                         </div>
                     </button>
                 )}
+                 <button
+                    onClick={onDownloadExcel}
+                    disabled={!isExcelDownloadable}
+                    className="px-2.5 py-1.5 bg-green-600 text-white rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-green-700 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150"
+                    title={excelDownloadTooltip}
+                >
+                    <div className="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        <span>Excel</span>
+                    </div>
+                </button>
                 {lastPublishTimestamp && (
                     <div className="text-teal-200 text-[10px] leading-tight hidden sm:block" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
                         Last publish: <br />
