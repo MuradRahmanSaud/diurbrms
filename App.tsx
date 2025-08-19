@@ -411,6 +411,18 @@ const AppContent: React.FC = () => {
     return history || [];
   }, [routineData, selectedSemesterIdForRoutineView]);
 
+  const lastPublishTimestamp = useMemo(() => {
+    if (!selectedSemesterIdForRoutineView || !routineData[selectedSemesterIdForRoutineView]?.publishHistory) {
+        return null;
+    }
+    const history = routineData[selectedSemesterIdForRoutineView]!.publishHistory;
+    if (!history || history.length === 0) {
+        return null;
+    }
+    // publishHistory is sorted with the latest first
+    return history[0].timestamp;
+  }, [routineData, selectedSemesterIdForRoutineView]);
+
   const activeRoutinesBySemester = useMemo(() => {
     const result: { [semesterId: string]: FullRoutineData } = {};
     for (const semesterId in routineData) {
@@ -768,6 +780,7 @@ const AppContent: React.FC = () => {
         onRoutineDisplayModeChange={setRoutineDisplayMode}
         onPublish={handleOpenPublishConfirmModal}
         isPublishable={isPublishable}
+        lastPublishTimestamp={lastPublishTimestamp}
       />
       <div className="flex flex-row flex-grow overflow-hidden" style={{ height: `calc(100vh - ${headerHeight})` }}>
         <Sidebar 

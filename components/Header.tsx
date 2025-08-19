@@ -17,12 +17,13 @@ interface HeaderProps {
   onRoutineDisplayModeChange: (mode: 'published' | 'editable') => void;
   onPublish: () => void;
   isPublishable: boolean;
+  lastPublishTimestamp: string | null;
 }
 
 const Header: React.FC<HeaderProps> = React.memo(({
   days, selectedDay, onDaySelect, selectedDate, onDateChange,
   routineViewMode, user, logout, onChangePassword, onShowUserDetail,
-  routineDisplayMode, onRoutineDisplayModeChange, onPublish, isPublishable
+  routineDisplayMode, onRoutineDisplayModeChange, onPublish, isPublishable, lastPublishTimestamp
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
@@ -156,19 +157,32 @@ const Header: React.FC<HeaderProps> = React.memo(({
                 </button>
             </div>
              {routineDisplayMode === 'editable' && (
-                <button
-                    onClick={onPublish}
-                    disabled={!isPublishable}
-                    className="px-2.5 py-1.5 bg-yellow-400 text-teal-900 rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-yellow-300 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150"
-                    title={isPublishable ? "Save the current editable routine as the new published version" : !user?.dashboardAccess?.canPublishRoutine ? "You do not have permission to publish routines" : "Select a program and a semester to enable publishing"}
-                >
-                    <div className="flex items-center gap-1.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                      </svg>
-                      <span>Publish</span>
-                    </div>
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onPublish}
+                        disabled={!isPublishable}
+                        className="px-2.5 py-1.5 bg-yellow-400 text-teal-900 rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-yellow-300 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150"
+                        title={isPublishable ? "Save the current editable routine as the new published version" : !user?.dashboardAccess?.canPublishRoutine ? "You do not have permission to publish routines" : "Select a program and a semester to enable publishing"}
+                    >
+                        <div className="flex items-center gap-1.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        </svg>
+                        <span>Publish</span>
+                        </div>
+                    </button>
+                    {lastPublishTimestamp && (
+                        <div className="text-teal-200 text-[10px] leading-tight hidden sm:block" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
+                            Last publish: <br />
+                            <span className="font-semibold text-white">
+                                {new Date(lastPublishTimestamp).toLocaleString([], {
+                                    month: 'short', day: 'numeric',
+                                    hour: '2-digit', minute: '2-digit', hour12: true
+                                })}
+                            </span>
+                        </div>
+                    )}
+                </div>
             )}
         </div>
 
