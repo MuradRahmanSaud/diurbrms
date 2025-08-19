@@ -812,14 +812,6 @@ const AppContent: React.FC = () => {
         logout={logout}
         onChangePassword={handleChangePassword}
         onShowUserDetail={handleShowUserDetail}
-        routineDisplayMode={routineDisplayMode}
-        onRoutineDisplayModeChange={setRoutineDisplayMode}
-        onPublish={handleOpenPublishConfirmModal}
-        isPublishable={isPublishable}
-        lastPublishTimestamp={lastPublishTimestamp}
-        onDownloadExcel={handleDownloadExcel}
-        isExcelDownloadable={isExcelDownloadable}
-        excelDownloadTooltip={excelDownloadTooltip}
       />
       <div className="flex flex-row flex-grow overflow-hidden" style={{ height: `calc(100vh - ${headerHeight})` }}>
         <Sidebar 
@@ -853,6 +845,13 @@ const AppContent: React.FC = () => {
           routineViewMode={routineViewMode}
           onToggleRoutineViewMode={handleToggleRoutineViewMode}
           routineDisplayMode={routineDisplayMode}
+          onRoutineDisplayModeChange={setRoutineDisplayMode}
+          onPublish={handleOpenPublishConfirmModal}
+          isPublishable={isPublishable}
+          lastPublishTimestamp={lastPublishTimestamp}
+          onDownloadExcel={handleDownloadExcel}
+          isExcelDownloadable={isExcelDownloadable}
+          excelDownloadTooltip={excelDownloadTooltip}
           selectedLevelTermFilter={selectedLevelTermFilter}
           setSelectedLevelTermFilter={setSelectedLevelTermFilter}
           selectedSectionFilter={selectedSectionFilter}
@@ -1287,7 +1286,7 @@ const AppContent: React.FC = () => {
             <div className="p-4 text-sm text-gray-600 space-y-4">
                 <div>
                     <p>
-                        Are you sure you want to publish the current <span className="font-semibold text-gray-800">editable</span> routine for the selected program?
+                        Are you sure you want to publish the current <span className="font-semibold text-gray-800">draft</span> routine for the selected program?
                     </p>
                     {!hasChangesToPublish && (
                         <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800 text-center">

@@ -13,21 +13,11 @@ interface HeaderProps {
   logout: () => void;
   onChangePassword: (userId: string, current: string, newPass: string) => Promise<void>;
   onShowUserDetail: (userId: string) => void;
-  routineDisplayMode: 'published' | 'editable';
-  onRoutineDisplayModeChange: (mode: 'published' | 'editable') => void;
-  onPublish: () => void;
-  isPublishable: boolean;
-  lastPublishTimestamp: string | null;
-  onDownloadExcel: () => void;
-  isExcelDownloadable: boolean;
-  excelDownloadTooltip: string;
 }
 
 const Header: React.FC<HeaderProps> = React.memo(({
   days, selectedDay, onDaySelect, selectedDate, onDateChange,
   routineViewMode, user, logout, onChangePassword, onShowUserDetail,
-  routineDisplayMode, onRoutineDisplayModeChange, onPublish, isPublishable, lastPublishTimestamp,
-  onDownloadExcel, isExcelDownloadable, excelDownloadTooltip
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
@@ -115,15 +105,6 @@ const Header: React.FC<HeaderProps> = React.memo(({
     return `${base} text-gray-500 hover:text-gray-700 border-b-2 border-transparent`;
   }
 
-  const getModeButtonClasses = (mode: 'published' | 'editable') => {
-      const base = "px-2 py-1 text-xs sm:text-sm font-semibold rounded-md transition-colors duration-150 flex-1";
-      const disabledClasses = "disabled:bg-teal-800 disabled:text-teal-500 disabled:cursor-not-allowed disabled:shadow-none";
-      if (routineDisplayMode === mode) {
-          return `${base} bg-white text-teal-700 shadow-inner ${disabledClasses}`;
-      }
-      return `${base} text-teal-100 hover:bg-white/20 ${disabledClasses}`;
-  };
-
   return (
     <header className="w-full bg-[var(--color-primary-700)] text-[var(--color-text-on-primary)] p-1 sm:p-1.5 shadow-md relative z-40">
       <div className="px-1 sm:px-2 flex flex-row flex-nowrap justify-between items-center gap-2 sm:gap-3">
@@ -138,71 +119,6 @@ const Header: React.FC<HeaderProps> = React.memo(({
             </p>
           </div>
         </div>
-
-        <div className="flex-grow flex items-center justify-center gap-2">
-            <div className="flex-shrink-0 bg-teal-800 p-0.5 rounded-lg flex w-48 shadow-md">
-                <button
-                    onClick={() => onRoutineDisplayModeChange('editable')}
-                    className={getModeButtonClasses('editable')}
-                    aria-pressed={routineDisplayMode === 'editable'}
-                    disabled={!user?.dashboardAccess?.canViewEditableRoutine}
-                    title={!user?.dashboardAccess?.canViewEditableRoutine ? "Permission denied to view editable routine" : ""}
-                >
-                    Editable
-                </button>
-                <button
-                    onClick={() => onRoutineDisplayModeChange('published')}
-                    className={getModeButtonClasses('published')}
-                    aria-pressed={routineDisplayMode === 'published'}
-                    disabled={!user?.dashboardAccess?.canViewPublishedRoutine}
-                    title={!user?.dashboardAccess?.canViewPublishedRoutine ? "Permission denied to view published routine" : ""}
-                >
-                    Published
-                </button>
-            </div>
-             <div className="flex items-center gap-2">
-                {routineDisplayMode === 'editable' && (
-                    <button
-                        onClick={onPublish}
-                        disabled={!isPublishable}
-                        className="px-2.5 py-1.5 bg-yellow-400 text-teal-900 rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-yellow-300 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150"
-                        title={isPublishable ? "Save the current editable routine as the new published version" : !user?.dashboardAccess?.canPublishRoutine ? "You do not have permission to publish routines" : "Select a program and a semester to enable publishing"}
-                    >
-                        <div className="flex items-center gap-1.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                        </svg>
-                        <span>Publish</span>
-                        </div>
-                    </button>
-                )}
-                 <button
-                    onClick={onDownloadExcel}
-                    disabled={!isExcelDownloadable}
-                    className="px-2.5 py-1.5 bg-green-600 text-white rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-green-700 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150"
-                    title={excelDownloadTooltip}
-                >
-                    <div className="flex items-center gap-1.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                        <span>Excel</span>
-                    </div>
-                </button>
-                {lastPublishTimestamp && (
-                    <div className="text-teal-200 text-[10px] leading-tight hidden sm:block" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
-                        Last publish: <br />
-                        <span className="font-semibold text-white">
-                            {new Date(lastPublishTimestamp).toLocaleString([], {
-                                month: 'short', day: 'numeric',
-                                hour: '2-digit', minute: '2-digit', hour12: true
-                            })}
-                        </span>
-                    </div>
-                )}
-            </div>
-        </div>
-
 
         <div className="flex items-center justify-end gap-2 sm:gap-3 min-w-0">
           <DaySelector

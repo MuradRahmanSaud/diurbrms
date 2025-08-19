@@ -61,7 +61,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     canCustomizeTheme: "Customize Theme",
     canDragAndDrop: "Drag & Drop Scheduling",
     canViewSlotHistory: "View Slot History",
-    canViewEditableRoutine: "View Editable Routine",
+    canViewEditableRoutine: "View Draft Routine",
     canViewPublishedRoutine: "View Published Routine",
     canPublishRoutine: "Publish Routines",
     // ProgramManagementAccess
@@ -1118,7 +1118,6 @@ const TeacherCoursesTab: React.FC<{ user: User, coursesData: EnrollmentEntry[], 
                             const isDragging = draggingSectionId === section.sectionId;
                             const isDragOver = dragOverSectionId === section.sectionId;
                             const rowStats = getTreeStats(section);
-
                             return (
                                 <React.Fragment key={section.sectionId}>
                                     <tr draggable="true" onDragStart={(e) => handleDragStart(e, section.sectionId)} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDragEnter={(e) => handleRowDragEnter(e, section.sectionId)} onDragLeave={handleRowDragLeave} onDrop={(e) => handleDropOnRow(e, section.sectionId)} className={`transition-all duration-150 ${isDragging ? '' : ''} ${isDragOver ? 'bg-teal-100 ring-2 ring-teal-400' : ''}`}>

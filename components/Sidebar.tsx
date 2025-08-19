@@ -52,6 +52,13 @@ interface SidebarProps {
   routineViewMode: RoutineViewMode;
   onToggleRoutineViewMode: () => void;
   routineDisplayMode: 'published' | 'editable';
+  onRoutineDisplayModeChange: (mode: 'published' | 'editable') => void;
+  onPublish: () => void;
+  isPublishable: boolean;
+  lastPublishTimestamp: string | null;
+  onDownloadExcel: () => void;
+  isExcelDownloadable: boolean;
+  excelDownloadTooltip: string;
   selectedLevelTermFilter: string | null;
   setSelectedLevelTermFilter: (levelTerm: string | null) => void;
   selectedSectionFilter: string | null;
@@ -850,7 +857,9 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
     setSelectedSemesterIdForRoutineView, allSemesterConfigurations, logout, sidebarStats, slotUsageStats,
     ciwCounts, classRequirementCounts, dashboardTabFilter, setDashboardTabFilter, onShowCourseList,
     onShowSectionList, onShowRoomList, onShowTeacherList, onShowAttendanceLog, coursesData, setCoursesData,
-    routineViewMode, onToggleRoutineViewMode, routineDisplayMode, selectedLevelTermFilter, setSelectedLevelTermFilter,
+    routineViewMode, onToggleRoutineViewMode, routineDisplayMode, onRoutineDisplayModeChange, onPublish,
+    isPublishable, lastPublishTimestamp, onDownloadExcel, isExcelDownloadable, excelDownloadTooltip,
+    selectedLevelTermFilter, setSelectedLevelTermFilter,
     selectedSectionFilter, setSelectedSectionFilter, selectedTeacherIdFilter, setSelectedTeacherIdFilter,
     selectedCourseSectionIdsFilter, setSelectedCourseSectionIdsFilter, onPreviewTeacherRoutine, onPreviewLevelTermRoutine,
     onPreviewFullRoutine, onPreviewCourseSectionRoutine, onUpdateLevelTerm, onUpdateWeeklyClass, onUpdateCourseType,
@@ -1090,6 +1099,15 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
       </div>
   );
 
+  const getModeButtonClasses = (mode: 'published' | 'editable') => {
+      const base = "px-2 py-1.5 text-xs font-semibold rounded-md transition-colors duration-150 flex-1 shadow-sm";
+      const disabledClasses = "disabled:bg-teal-800 disabled:text-teal-400 disabled:cursor-not-allowed disabled:shadow-none";
+      if (routineDisplayMode === mode) {
+          return `${base} bg-yellow-400 text-teal-900 ${disabledClasses}`;
+      }
+      return `${base} bg-teal-800 text-teal-200 hover:bg-teal-700 ${disabledClasses}`;
+  };
+
   return (
     <div className={`${SHARED_SIDE_PANEL_WIDTH_CLASSES} h-full relative flex-shrink-0`}>
       <aside className={`bg-gradient-to-b from-[var(--color-primary-700)] to-[var(--color-primary-900)] text-slate-100 w-full h-full shadow-lg flex flex-col ${SIDEBAR_FOOTER_PADDING_BOTTOM_CLASS}`}>
@@ -1122,6 +1140,42 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
         </div>
 
         <div className="flex-grow flex flex-col min-h-0 overflow-y-auto no-scrollbar px-2 sm:px-2.5 pb-2">
+            
+            <div className="mt-3 mb-3 space-y-2">
+                <div className="bg-teal-900 p-0.5 rounded-lg flex shadow-md">
+                    <button onClick={() => onRoutineDisplayModeChange('editable')} className={getModeButtonClasses('editable')} aria-pressed={routineDisplayMode === 'editable'} disabled={!user?.dashboardAccess?.canViewEditableRoutine} title={!user?.dashboardAccess?.canViewEditableRoutine ? "Permission denied to view draft routine" : "View the editable draft of the routine"}>
+                        Draft
+                    </button>
+                    <button onClick={() => onRoutineDisplayModeChange('published')} className={getModeButtonClasses('published')} aria-pressed={routineDisplayMode === 'published'} disabled={!user?.dashboardAccess?.canViewPublishedRoutine} title={!user?.dashboardAccess?.canViewPublishedRoutine ? "Permission denied to view published routine" : "View the official, published version of the routine"}>
+                        Published
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    {routineDisplayMode === 'editable' && (
+                        <button onClick={onPublish} disabled={!isPublishable} className="px-2.5 py-1.5 bg-yellow-400 text-teal-900 rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-yellow-300 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150" title={isPublishable ? "Save the current draft routine as the new published version" : !user?.dashboardAccess?.canPublishRoutine ? "You do not have permission to publish routines" : "Select a program and a semester to enable publishing"}>
+                            <div className="flex items-center justify-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
+                            <span>Publish</span>
+                            </div>
+                        </button>
+                    )}
+                    <button onClick={onDownloadExcel} disabled={!isExcelDownloadable} className={`px-2.5 py-1.5 bg-green-600 text-white rounded-md text-xs sm:text-sm font-semibold shadow-md hover:bg-green-700 disabled:bg-teal-700 disabled:text-teal-400 disabled:cursor-not-allowed transition-all duration-150 ${routineDisplayMode !== 'editable' ? 'col-span-2' : ''}`} title={excelDownloadTooltip}>
+                        <div className="flex items-center justify-center gap-1.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            <span>Excel</span>
+                        </div>
+                    </button>
+                </div>
+                {lastPublishTimestamp && (
+                    <div className="text-teal-200 text-center text-[10px] leading-tight pt-1" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
+                        Last publish: <span className="font-semibold text-white">{new Date(lastPublishTimestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                    </div>
+                )}
+            </div>
+
+            <div className="border-t border-teal-700/50 my-3"></div>
+
             {selectedSemesterIdForRoutineView === null ? (
               <div className="h-full flex flex-col items-center justify-center p-4 text-center text-teal-200 bg-teal-800/50 rounded-md mt-3">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
