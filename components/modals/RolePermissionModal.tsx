@@ -4,6 +4,7 @@ import { useRolePermissions, RolePermissions } from '../../contexts/RolePermissi
 import { User, UserRole, RoomEditAccess, DashboardAccess, ProgramManagementAccess, NotificationAccess, AssignAccessLevel } from '../../types';
 
 const PERMISSION_LABELS: Record<string, string> = {
+    // RoomEditAccess
     canManageRoomManagement: "Manage Rooms Panel",
     canAddBuilding: "Add Building",
     canAddRoom: "Add Room",
@@ -14,6 +15,7 @@ const PERMISSION_LABELS: Record<string, string> = {
     canEditSlotsTab: "Edit Room Slots",
     canImportRoomData: "Import Room Data",
     canExportRoomData: "Export Room Data",
+    // DashboardAccess
     canViewCourseList: "View Course List",
     canViewSectionList: "View Section List",
     canViewRoomList: "View Room List",
@@ -34,8 +36,13 @@ const PERMISSION_LABELS: Record<string, string> = {
     canCustomizeTheme: "Customize Theme",
     canDragAndDrop: "Drag & Drop Scheduling",
     canViewSlotHistory: "View Slot History",
+    canViewEditableRoutine: "View Editable Routine",
+    canViewPublishedRoutine: "View Published Routine",
+    canPublishRoutine: "Publish Routines",
+    // ProgramManagementAccess
     canAddProgram: "Add New Program",
     canEditProgram: "Edit Program Details",
+    // NotificationAccess
     canGetNotification: "Get Slot Notifications",
     canApproveSlots: "Approve Slot Changes",
 };
@@ -240,10 +247,13 @@ const RolePermissionModal: React.FC<{ isOpen: boolean; onClose: () => void; }> =
                             <div className="space-y-4">
                                 {isRoleDisabled && <div className="p-3 bg-yellow-100 text-yellow-800 text-sm rounded-md">Admin permissions are fixed and cannot be changed.</div>}
                                 
-                                <PermissionGroup title="Dashboard Access" colorIndex={0}>
+                                <PermissionGroup title="Routine Access & Actions" colorIndex={0}>
+                                    {renderPermissionGroup(['canViewEditableRoutine', 'canViewPublishedRoutine', 'canPublishRoutine'], 'dashboardAccess')}
+                                </PermissionGroup>
+                                <PermissionGroup title="Dashboard Access" colorIndex={1}>
                                     {renderPermissionGroup(['canViewCourseList', 'canViewSectionList', 'canViewRoomList', 'canViewTeacherList', 'canViewSlotRequirement', 'canViewSlotUsage', 'canViewMakeupSchedule', 'canViewSectionTable', 'canCustomizeTheme'], 'dashboardAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="Routine Management" colorIndex={1}>
+                                <PermissionGroup title="Routine Management" colorIndex={2}>
                                     <div className="space-y-4">
                                         {renderPermissionGroup(['canAutoAssign', 'canManageVersions', 'canDragAndDrop', 'canViewSlotHistory'], 'dashboardAccess')}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
@@ -277,21 +287,21 @@ const RolePermissionModal: React.FC<{ isOpen: boolean; onClose: () => void; }> =
                                         </div>
                                     </div>
                                 </PermissionGroup>
-                                <PermissionGroup title="Room Management" colorIndex={2}>
+                                <PermissionGroup title="Room Management" colorIndex={3}>
                                     {renderPermissionGroup(['canManageRoomManagement', 'canAddBuilding', 'canAddRoom', 'canViewRoomDetail', 'canEditAssignToProgram', 'canEditShareWithPrograms', 'canEditDetailsTab', 'canEditSlotsTab', 'canImportRoomData', 'canExportRoomData'], 'roomEditAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="Course Data" colorIndex={3}>
+                                <PermissionGroup title="Course Data" colorIndex={4}>
                                     {renderPermissionGroup(['canEditCourseSectionDetails', 'canImportCourseData', 'canExportCourseData'], 'dashboardAccess')}
                                 </PermissionGroup>
-                                <PermissionGroup title="System Setup" colorIndex={4}>
+                                <PermissionGroup title="System Setup" colorIndex={5}>
                                     {renderPermissionGroup(['canManageProgramSetup', 'canManageDefaultSlots', 'canManageSemesterSetup'], 'dashboardAccess')}
                                 </PermissionGroup>
                                 {currentPermissions?.dashboardAccess?.canManageProgramSetup && (
-                                <PermissionGroup title="Program Management" colorIndex={5}>
+                                <PermissionGroup title="Program Management" colorIndex={6}>
                                     {renderPermissionGroup(['canAddProgram', 'canEditProgram'], 'programManagementAccess')}
                                 </PermissionGroup>
                                 )}
-                                <PermissionGroup title="Notifications" colorIndex={6}>
+                                <PermissionGroup title="Notifications" colorIndex={7}>
                                     {renderPermissionGroup(['canGetNotification', 'canApproveSlots'], 'notificationAccess')}
                                 </PermissionGroup>
                             </div>

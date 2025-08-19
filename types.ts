@@ -1,4 +1,5 @@
 
+
 export type TimeSlot =
   | '08:30 AM - 10:00 AM'
   | '10:00 AM - 11:30 AM'
@@ -269,10 +270,18 @@ export interface RoutineVersion {
     routine: FullRoutineData;
 }
 
+export interface PublishHistoryEntry {
+  timestamp: string; // ISO string
+  userId: string;
+  userName: string;
+  programPId: string; // which program's routine was updated
+}
+
 export interface SemesterRoutineData {
     versions: RoutineVersion[];
     activeVersionId: string | null;
     publishedVersionId?: string | null;
+    publishHistory?: PublishHistoryEntry[];
 }
 
 // ---- Auth Types ----

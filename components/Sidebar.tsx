@@ -317,8 +317,12 @@ const SlotRequirementTable = ({
                         break;
                 }
 
-                if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-                if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+                if (typeof aValue === 'string' && typeof bValue === 'string') {
+                    return direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+                }
+                if (typeof aValue === 'number' && typeof bValue === 'number') {
+                    return direction === 'asc' ? aValue - bValue : bValue - aValue;
+                }
                 return 0;
             });
         }
@@ -481,7 +485,7 @@ const SlotRequirementTable = ({
                                         </button>
                                     </div>
                                     <div className="grid grid-cols-3 gap-1 mt-1">
-                                        {levelTermGrid.flat().map(term => (
+                                        {levelTermGrid.flat().map((term: string) => (
                                             <button
                                                 key={term}
                                                 onClick={() => setLevelTermFilter(term)}
@@ -687,6 +691,23 @@ const RoutineFiltersAndPreview = ({
     handlePreviewClick,
     isPreviewDisabled,
     previewTitle,
+}: {
+    user: User | null;
+    coursesData: EnrollmentEntry[];
+    selectedSemesterIdForRoutineView: string | null;
+    selectedProgramIdForRoutineView: string | null;
+    programs: ProgramEntry[];
+    handleTeacherSelect: (teacherId: string | null) => void;
+    selectedTeacherIdFilter: string | null;
+    handleCourseSectionSelect: (sectionIds: string[]) => void;
+    selectedCourseSectionIdsFilter: string[];
+    handleLevelTermSelect: (levelTerm: string | null) => void;
+    selectedLevelTermFilter: string | null;
+    setSelectedSectionFilter: (section: string | null) => void;
+    selectedSectionFilter: string | null;
+    handlePreviewClick: () => void;
+    isPreviewDisabled: boolean;
+    previewTitle: string;
 }) => {
     const levelTermFilters = useMemo(() => {
         let relevantCourses = coursesData;
@@ -796,7 +817,7 @@ const RoutineFiltersAndPreview = ({
                             <button onClick={() => handleLevelTermSelect('N/A')} className={`w-full px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === 'N/A' ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>N/A</button>
                         </div>
                         <div className="grid grid-cols-3 gap-1">
-                            {levelTermGrid.flat().map(term => (<button key={term} onClick={() => handleLevelTermSelect(term)} className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === term ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>{term.replace('T', '-T')}</button>))}
+                            {levelTermGrid.flat().map((term: string) => (<button key={term} onClick={() => handleLevelTermSelect(term)} className={`px-2 py-0.5 text-xs font-bold rounded-sm transition-all duration-200 ${ selectedLevelTermFilter === term ? 'bg-yellow-400 text-teal-900 shadow' : 'text-teal-200 bg-teal-800 hover:bg-teal-700/50' }`}>{term.replace('T', '-T')}</button>))}
                         </div>
                     </div>
                 </div>
@@ -863,6 +884,33 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
         setEditingSection(null);
     }
   }, [showSlotRequirements]);
+
+  const shouldShowDashboardStats = useMemo(() => {
+    if (!user?.dashboardAccess) {
+        return false;
+    }
+
+    // A user with "only publish routine access" is defined as someone who
+    // can publish, but cannot view any of the dashboard's main data lists.
+    const canPublish = user.dashboardAccess.canPublishRoutine === true;
+
+    const canViewDashboardLists =
+        user.dashboardAccess.canViewCourseList ||
+        user.dashboardAccess.canViewSectionList ||
+        user.dashboardAccess.canViewRoomList ||
+        user.dashboardAccess.canViewTeacherList ||
+        user.dashboardAccess.canViewSlotRequirement ||
+        user.dashboardAccess.canViewSlotUsage ||
+        user.dashboardAccess.canViewMakeupSchedule ||
+        user.dashboardAccess.canViewTotalSlots;
+
+    if (canPublish && !canViewDashboardLists) {
+        return false; // This is the specific user type we want to hide stats for.
+    }
+
+    // For all other users, show the stats.
+    return true;
+  }, [user]);
 
   const coursesForSlotRequirementView = useMemo(() => {
     let relevantCourses = coursesData;
@@ -1093,9 +1141,10 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
                                 selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
                             />
                         ) : (
+                            shouldShowDashboardStats && (
                             <div className="mt-3 space-y-2">
                                 <div className="flex justify-between items-center mb-2">
-                                    <button onClick={onToggleRoutineViewMode} disabled={selectedProgramIdForRoutineView === null || routineDisplayMode === 'published'} className="flex items-center gap-2 text-xs font-semibold text-teal-200 hover:text-yellow-300 transition-colors focus:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed" title={routineDisplayMode === 'published' ? "Day-centric view is disabled in Published mode" : selectedProgramIdForRoutineView === null ? "Select a program to change view mode" : routineViewMode === 'roomCentric' ? 'Switch to Day-Centric View' : 'Switch to Room-Centric View'}>
+                                    <button onClick={onToggleRoutineViewMode} disabled={selectedProgramIdForRoutineView === null} className="flex items-center gap-2 text-xs font-semibold text-teal-200 hover:text-yellow-300 transition-colors focus:outline-none rounded disabled:opacity-50 disabled:cursor-not-allowed" title={selectedProgramIdForRoutineView === null ? "Select a program to change view mode" : routineViewMode === 'roomCentric' ? 'Switch to Day-Centric View' : 'Switch to Room-Centric View'}>
                                         {routineViewMode === 'roomCentric' ? (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>) : (<svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>)}
                                         Dashboard
                                     </button>
@@ -1116,6 +1165,7 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
                                 </div>
                                 {user?.dashboardAccess?.canViewSlotUsage && (<div className="flex-shrink-0 mt-2 space-y-1"><div className="flex justify-between items-baseline"><p className="text-xs font-semibold text-teal-200">Slot Usage</p><p className="text-xs font-bold text-white">{slotUsageStats.booked} / {slotUsageStats.total}</p></div><div className="w-full bg-teal-900 rounded-full h-2 border border-teal-800"><div className="bg-yellow-400 h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${slotUsageStats.total > 0 ? (slotUsageStats.booked / slotUsageStats.total) * 100 : 0}%` }}></div></div></div>)}
                             </div>
+                            )
                         )
                     )}
                 </>

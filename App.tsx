@@ -19,7 +19,7 @@ import { useModalManager } from './hooks/useModalManager';
 import { generateTeacherRoutinePDF, generateLevelTermRoutinePDF, generateFullRoutinePDF, generateCourseSectionRoutinePDF } from './utils/pdfGenerator';
 import { SHARED_SIDE_PANEL_WIDTH_CLASSES, SIDEBAR_FOOTER_HEIGHT_PX } from './styles/layoutConstants'; 
 import RoutineGrid from './components/RoutineGrid';
-import { DefaultTimeSlot, FullRoutineData, RoomEntry, SemesterRoutineData, User, PendingChange, Notification, ClassDetail, RoutineVersion, DayOfWeek, TimeSlot } from './types';
+import { DefaultTimeSlot, FullRoutineData, RoomEntry, SemesterRoutineData, User, PendingChange, Notification, ClassDetail, RoutineVersion, DayOfWeek, TimeSlot, PublishHistoryEntry } from './types';
 import LogAttendanceModal from './components/modals/LogAttendanceModal';
 
 // Lazy load components
@@ -223,8 +223,8 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handlePublishRoutine = useCallback(() => {
-    if (!selectedSemesterIdForRoutineView || !activeProgramIdInSidebar) {
-        console.error("Attempted to publish without a selected semester or program.");
+    if (!selectedSemesterIdForRoutineView || !activeProgramIdInSidebar || !user) {
+        console.error("Attempted to publish without a selected semester, program, or user.");
         return;
     }
     const program = allPrograms.find(p => p.id === activeProgramIdInSidebar);
@@ -302,18 +302,99 @@ const AppContent: React.FC = () => {
 
         semesterData.versions.unshift(newPublishedVersion);
         semesterData.publishedVersionId = newPublishedVersionId;
+
+        // Add to publish history
+        const newPublishHistoryEntry: PublishHistoryEntry = {
+            timestamp: new Date().toISOString(),
+            userId: user.id,
+            userName: user.name,
+            programPId: programPId,
+        };
+        const existingHistory = semesterData.publishHistory || [];
+        semesterData.publishHistory = [newPublishHistoryEntry, ...existingHistory].slice(0, 5);
         
         semesterData.versions.sort((a: RoutineVersion, b: RoutineVersion) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         
         newData[selectedSemesterIdForRoutineView] = semesterData;
         return newData;
     });
-  }, [selectedSemesterIdForRoutineView, activeProgramIdInSidebar, setRoutineData, allPrograms]);
+  }, [selectedSemesterIdForRoutineView, activeProgramIdInSidebar, setRoutineData, allPrograms, user]);
 
   const handleConfirmPublish = useCallback(() => {
     handlePublishRoutine();
     handleClosePublishConfirmModal();
   }, [handlePublishRoutine, handleClosePublishConfirmModal]);
+
+  const hasChangesToPublish = useMemo(() => {
+    if (!selectedSemesterIdForRoutineView || !activeProgramIdInSidebar) {
+        return false;
+    }
+    const program = allPrograms.find(p => p.id === activeProgramIdInSidebar);
+    if (!program) {
+        return false;
+    }
+    const programPId = program.pId;
+
+    const semesterData = routineData[selectedSemesterIdForRoutineView];
+    if (!semesterData || !semesterData.activeVersionId) {
+        return false;
+    }
+    
+    const activeVersion = semesterData.versions.find(v => v.versionId === semesterData.activeVersionId);
+    const publishedVersion = semesterData.publishedVersionId 
+        ? semesterData.versions.find(v => v.versionId === semesterData.publishedVersionId)
+        : null;
+
+    if (!activeVersion) {
+        return false;
+    }
+        
+    const activeRoutine = activeVersion.routine;
+    const publishedRoutine = publishedVersion ? publishedVersion.routine : {};
+
+    const getProgramClasses = (routine: FullRoutineData): Map<string, ClassDetail> => {
+        const classMap = new Map<string, ClassDetail>();
+        if (!routine) return classMap;
+
+        for (const day of Object.keys(routine) as DayOfWeek[]) {
+            const dayData = routine[day];
+            if (dayData) {
+                for (const room of Object.keys(dayData)) {
+                    for (const slot of Object.keys(dayData[room]) as TimeSlot[]) {
+                        const classInfo = dayData[room][slot];
+                        if (classInfo?.pId === programPId) {
+                            const key = `${day}-${room}-${slot}`;
+                            classMap.set(key, classInfo);
+                        }
+                    }
+                }
+            }
+        }
+        return classMap;
+    };
+
+    const activeProgramClasses = getProgramClasses(activeRoutine);
+    const publishedProgramClasses = getProgramClasses(publishedRoutine);
+    
+    if (activeProgramClasses.size !== publishedProgramClasses.size) {
+        return true;
+    }
+    
+    for (const [key, activeClass] of activeProgramClasses.entries()) {
+        const publishedClass = publishedProgramClasses.get(key);
+        if (!publishedClass) {
+            return true;
+        }
+        if (activeClass.courseCode !== publishedClass.courseCode ||
+            activeClass.section !== publishedClass.section ||
+            activeClass.teacher !== publishedClass.teacher) {
+            return true;
+        }
+    }
+    
+    return false;
+
+  }, [routineData, selectedSemesterIdForRoutineView, activeProgramIdInSidebar, allPrograms]);
 
   const isPublishable = useMemo(() => {
     if (!user?.dashboardAccess?.canPublishRoutine) return false;
@@ -323,6 +404,12 @@ const AppContent: React.FC = () => {
     const activeVersion = semesterData.versions.find(v => v.versionId === semesterData.activeVersionId);
     return !!activeVersion;
   }, [user, selectedSemesterIdForRoutineView, routineData, activeProgramIdInSidebar]);
+  
+  const publishHistoryForModal = useMemo(() => {
+    if (!selectedSemesterIdForRoutineView) return [];
+    const history = routineData[selectedSemesterIdForRoutineView]?.publishHistory;
+    return history || [];
+  }, [routineData, selectedSemesterIdForRoutineView]);
 
   const activeRoutinesBySemester = useMemo(() => {
     const result: { [semesterId: string]: FullRoutineData } = {};
@@ -1134,20 +1221,47 @@ const AppContent: React.FC = () => {
                     <button onClick={handleClosePublishConfirmModal} className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md">
                         Cancel
                     </button>
-                    <button onClick={handleConfirmPublish} className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-md">
+                    <button 
+                        onClick={handleConfirmPublish} 
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={!hasChangesToPublish}
+                    >
                         Yes, Publish
                     </button>
                 </div>
             }
             maxWidthClass="max-w-md"
         >
-            <div className="p-4 text-sm text-gray-600 space-y-2">
-                <p>
-                    Are you sure you want to publish the current <span className="font-semibold text-gray-800">editable</span> routine for the selected program?
-                </p>
-                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded-md text-xs">
-                    <p className="font-semibold text-yellow-800">This action will ONLY update classes for the <span className="font-bold">{allPrograms.find(p => p.id === activeProgramIdInSidebar)?.shortName}</span> program.</p>
-                    <p className="mt-1 text-yellow-700">The published routine for all other programs will remain unchanged.</p>
+            <div className="p-4 text-sm text-gray-600 space-y-4">
+                <div>
+                    <p>
+                        Are you sure you want to publish the current <span className="font-semibold text-gray-800">editable</span> routine for the selected program?
+                    </p>
+                    {!hasChangesToPublish && (
+                        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800 text-center">
+                            <p className="font-semibold">No changes detected for this program's routine. Publishing is not necessary.</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t pt-4">
+                    <h4 className="font-semibold text-gray-800 mb-2">Recent Publish History (Last 5)</h4>
+                    {publishHistoryForModal.length > 0 ? (
+                        <ul className="space-y-2 text-xs">
+                            {publishHistoryForModal.map((entry, index) => (
+                                <li key={index} className="p-2 bg-gray-100 rounded-md border border-gray-200">
+                                    <p>
+                                        Published by <span className="font-semibold text-teal-700">{entry.userName}</span> for program <span className="font-semibold text-teal-700">{getProgramShortNameFromApp(entry.programPId)}</span>
+                                    </p>
+                                    <p className="text-gray-500 text-right text-[10px] mt-1">
+                                        {new Date(entry.timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                                    </p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-xs text-gray-500 italic text-center py-2">No publish history for this semester yet.</p>
+                    )}
                 </div>
             </div>
         </Modal>
