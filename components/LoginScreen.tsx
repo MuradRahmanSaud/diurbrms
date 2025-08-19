@@ -72,18 +72,23 @@ const LoginScreen: React.FC = () => {
                             </svg>
                             <span className="text-2xl font-bold">RBRMS</span>
                         </div>
-                        <p className="mt-4 text-teal-200">Intelligent Class Routine Management for Daffodil International University.</p>
+                        <p className="mt-4 text-teal-200">Routine Based Room Management System</p>
+                         <p className="mt-6 text-sm text-teal-100/90 border-l-2 border-teal-400 pl-4">
+                            This system offers a comprehensive solution for managing academic schedules and room allocations. It simplifies the complex process of routine creation, ensuring optimal use of resources, minimizing conflicts, and providing a clear, accessible interface for administrators, faculty, and students.
+                        </p>
                     </div>
                     <div className="z-10 text-xs text-teal-300">
-                        &copy; {new Date().getFullYear()} RBRMS. All rights reserved.
+                        &copy; {new Date().getFullYear()} Daffodil International University. All rights reserved.
                     </div>
                 </div>
 
                 {/* Right Panel (Form) */}
                 <div className="w-full md:w-1/2 bg-white p-8 sm:p-12 space-y-6 flex flex-col justify-center">
-                    <div className="text-left animate-fade-in-up" style={animationStyle(100)}>
+                    <div className="text-center animate-fade-in-up" style={animationStyle(100)}>
                         <h1 className="text-3xl font-bold text-gray-900">Welcome Back!</h1>
-                        <p className="mt-2 text-sm text-gray-600">Please sign in to continue.</p>
+                        <p className="mt-2 text-sm text-gray-600">
+                            Sign in to access the dashboard.
+                        </p>
                     </div>
 
                     <form className="space-y-4 animate-fade-in-up" style={animationStyle(200)} onSubmit={handleSubmit} noValidate>
