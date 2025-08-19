@@ -156,8 +156,8 @@ const Header: React.FC<HeaderProps> = React.memo(({
                     Published
                 </button>
             </div>
-             {routineDisplayMode === 'editable' && (
-                <div className="flex items-center gap-2">
+             <div className="flex items-center gap-2">
+                {routineDisplayMode === 'editable' && (
                     <button
                         onClick={onPublish}
                         disabled={!isPublishable}
@@ -171,19 +171,19 @@ const Header: React.FC<HeaderProps> = React.memo(({
                         <span>Publish</span>
                         </div>
                     </button>
-                    {lastPublishTimestamp && (
-                        <div className="text-teal-200 text-[10px] leading-tight hidden sm:block" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
-                            Last publish: <br />
-                            <span className="font-semibold text-white">
-                                {new Date(lastPublishTimestamp).toLocaleString([], {
-                                    month: 'short', day: 'numeric',
-                                    hour: '2-digit', minute: '2-digit', hour12: true
-                                })}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
+                )}
+                {lastPublishTimestamp && (
+                    <div className="text-teal-200 text-[10px] leading-tight hidden sm:block" title={`Last published on ${new Date(lastPublishTimestamp).toLocaleString()}`}>
+                        Last publish: <br />
+                        <span className="font-semibold text-white">
+                            {new Date(lastPublishTimestamp).toLocaleString([], {
+                                month: 'short', day: 'numeric',
+                                hour: '2-digit', minute: '2-digit', hour12: true
+                            })}
+                        </span>
+                    </div>
+                )}
+            </div>
         </div>
 
 
