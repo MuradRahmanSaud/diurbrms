@@ -60,7 +60,7 @@ interface SidebarProps {
   setSelectedTeacherIdFilter: (teacherId: string | null) => void;
   selectedCourseSectionIdsFilter: string[];
   setSelectedCourseSectionIdsFilter: (sectionIds: string[]) => void;
-  onPreviewTeacherRoutine: (teacherId: string | null) => void;
+  onPreviewTeacherRoutine: () => void;
   onPreviewLevelTermRoutine: () => void;
   onPreviewFullRoutine: () => void;
   onPreviewCourseSectionRoutine: () => void;
@@ -1059,6 +1059,26 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
 
   const isPreviewDisabled = !selectedProgramIdForRoutineView || !selectedSemesterIdForRoutineView;
 
+  const handlePreviewClick = useCallback(() => {
+    if (selectedCourseSectionIdsFilter.length > 0) {
+        onPreviewCourseSectionRoutine();
+    } else if (selectedTeacherIdFilter) {
+        onPreviewTeacherRoutine();
+    } else if (selectedLevelTermFilter && selectedLevelTermFilter !== 'N/A') {
+        onPreviewLevelTermRoutine();
+    } else {
+        onPreviewFullRoutine();
+    }
+  }, [
+      selectedCourseSectionIdsFilter,
+      selectedTeacherIdFilter,
+      selectedLevelTermFilter,
+      onPreviewCourseSectionRoutine,
+      onPreviewTeacherRoutine,
+      onPreviewLevelTermRoutine,
+      onPreviewFullRoutine
+  ]);
+
   const canEditCourseSectionDetails = !!user?.dashboardAccess?.canEditCourseSectionDetails;
   
   const footerContent = (
@@ -1124,7 +1144,7 @@ const Sidebar: React.FC<SidebarProps> = React.memo((props) => {
                         selectedLevelTermFilter={selectedLevelTermFilter}
                         setSelectedSectionFilter={setSelectedSectionFilter}
                         selectedSectionFilter={selectedSectionFilter}
-                        handlePreviewClick={onPreviewFullRoutine}
+                        handlePreviewClick={handlePreviewClick}
                         isPreviewDisabled={isPreviewDisabled}
                         previewTitle={previewTitle}
                     />
