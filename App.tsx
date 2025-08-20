@@ -62,9 +62,10 @@ export const formatDefaultSlotToString = (slot: DefaultTimeSlot): string => {
 };
 
 
-const LoadingSpinner: React.FC = () => (
-    <div className="flex justify-center items-center h-full w-full bg-gray-100/50">
+const LoadingSpinner: React.FC<{ message?: string }> = ({ message = "Loading Application Data..." }) => (
+    <div className="flex flex-col justify-center items-center h-full w-full bg-gray-100">
       <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[var(--color-primary-500)]"></div>
+      <p className="mt-4 text-sm font-medium text-gray-600">{message}</p>
     </div>
 );
 
@@ -74,6 +75,10 @@ const AppContent: React.FC = () => {
   const [isPublishConfirmModalOpen, setIsPublishConfirmModalOpen] = useState(false);
 
   const {
+      // App State
+      isLoading,
+      error,
+      
       // State & Setters
       user, logout, users,
       selectedDay, handleDayChange,
@@ -121,6 +126,7 @@ const AppContent: React.FC = () => {
       handleOpenConflictModal,
       handleCloseConflictModal,
       handleApplyAiResolution,
+      handleCancelPendingChange, // New handler
       
       // Derived Data & Callbacks
       systemDefaultTimeSlots,
@@ -185,6 +191,21 @@ const AppContent: React.FC = () => {
       handleOpenSlotDetailModal,
       handleCloseSlotDetailModal,
   } = useModalManager({ allRooms });
+  
+  if (isLoading) {
+    return <LoadingSpinner message="Loading application data..." />;
+  }
+
+  if (error) {
+    return (
+        <div className="flex flex-col justify-center items-center h-full w-full bg-red-50 text-red-700">
+            <h2 className="text-2xl font-bold">Application Error</h2>
+            <p className="mt-2">Could not load initial data. Please check the API connection.</p>
+            <pre className="mt-4 p-2 bg-red-100 border border-red-300 rounded-md text-xs">{error}</pre>
+        </div>
+    );
+  }
+
 
   // Automatically switch to room-centric view when in published mode.
   useEffect(() => {
@@ -868,501 +889,3 @@ const AppContent: React.FC = () => {
           lastPublishTimestamp={lastPublishTimestamp}
           onDownloadExcel={handleDownloadExcel}
           isExcelDownloadable={isExcelDownloadable}
-          excelDownloadTooltip={excelDownloadTooltip}
-          selectedLevelTermFilter={selectedLevelTermFilter}
-          setSelectedLevelTermFilter={setSelectedLevelTermFilter}
-          selectedSectionFilter={selectedSectionFilter}
-          setSelectedSectionFilter={setSelectedSectionFilter}
-          selectedTeacherIdFilter={selectedTeacherIdFilter}
-          setSelectedTeacherIdFilter={setSelectedTeacherIdFilter}
-          selectedCourseSectionIdsFilter={selectedCourseSectionIdsFilter}
-          setSelectedCourseSectionIdsFilter={setSelectedCourseSectionIdsFilter}
-          onPreviewTeacherRoutine={handlePreviewTeacherRoutine}
-          onPreviewLevelTermRoutine={handlePreviewLevelTermRoutine}
-          onPreviewFullRoutine={handlePreviewFullRoutine}
-          onPreviewCourseSectionRoutine={handlePreviewCourseSectionRoutine}
-          onUpdateLevelTerm={handleUpdateCourseLevelTerm}
-          onUpdateWeeklyClass={handleUpdateWeeklyClass}
-          onUpdateCourseType={handleUpdateCourseType}
-          onBulkAssign={handleBulkAssign}
-          isBulkAssignDisabled={isBulkAssignDisabled}
-          bulkAssignTooltip={bulkAssignTooltip}
-          versions={versionsForCurrentSemester}
-          activeVersionId={activeVersionIdForCurrentSemester}
-          onVersionChange={handleVersionChange}
-          onDeleteVersion={handleDeleteVersion}
-          unreadNotificationCount={unreadNotificationCount}
-          pendingRequestCount={pendingRequestCount}
-          setRoutineData={setRoutineData}
-        />
-        <main className="flex-grow flex flex-col overflow-y-auto bg-[var(--color-bg-base)] p-2 relative min-w-0">
-            <Suspense fallback={<LoadingSpinner />}>
-              {activeMainView === 'routine' && (
-                activeProgramIdInSidebar && !programHasSlotsForMessage ? (
-                  <div className="text-center py-10 px-3 text-gray-600 bg-white rounded-md h-full flex flex-col justify-center items-center shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-lg sm:text-xl font-semibold mb-1">No Time Slots Defined</p>
-                    <p className="text-xs sm:text-sm">
-                      The program <span className="font-semibold">"{programNameToDisplay || 'selected'}"</span> has no specific time slots.
-                    </p>
-                    <p className="text-xs sm:text-sm mt-1">Please set them up in Settings &gt; Program Setup.</p>
-                  </div>
-                ) : (effectiveHeaderSlotsForGrid.length > 0 && (routineViewMode === 'dayCentric' || effectiveRoomEntriesForGrid.length > 0)) || (routineViewMode === 'roomCentric' && routineDataForGrid[selectedDay]) ? (
-                    <div className="overflow-auto rounded-lg shadow-lg flex-grow bg-[var(--color-bg-muted)] h-full -m-1">
-                      <RoutineGrid 
-                        user={user}
-                        routineData={routineDataForGrid} 
-                        selectedDayForRoomCentricView={selectedDay}
-                        roomEntries={effectiveRoomEntriesForGrid} 
-                        headerSlotObjects={effectiveHeaderSlotsForGrid} 
-                        systemDefaultSlots={systemDefaultTimeSlots} 
-                        onRoomHeaderClick={handleOpenRoomDetailModalWithPermissionCheck} 
-                        onDayTimeCellClick={handleOpenDayTimeSlotDetailModal}
-                        onSlotCellClick={handleOpenSlotDetailModal}
-                        routineViewMode={routineViewMode}
-                        getBuildingName={getBuildingNameFromApp}
-                        scheduleOverrides={scheduleOverrides}
-                        pendingChanges={pendingChanges}
-                        allSemesterConfigurations={allSemesterConfigurations}
-                        allPrograms={allPrograms}
-                        selectedDate={selectedDate}
-                        coursesData={coursesData}
-                        selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-                        activeProgramIdInSidebar={activeProgramIdInSidebar}
-                        activeDays={effectiveDaysForGrid}
-                        onMoveRoutineEntry={handleMoveRoutineEntry}
-                        onAssignSectionToSlot={handleAssignSectionToSlot}
-                        selectedLevelTermFilter={selectedLevelTermFilter}
-                        selectedSectionFilter={selectedSectionFilter}
-                        selectedTeacherIdFilter={selectedTeacherIdFilter}
-                        selectedCourseSectionIdsFilter={selectedCourseSectionIdsFilter}
-                        onLogAttendance={handleOpenLogAttendanceModal}
-                        onOpenConflictModal={handleOpenConflictModal}
-                        isEditable={isEditable}
-                      />
-                    </div>
-                  ) : (
-                  <div className="text-center py-10 px-3 text-gray-500 bg-white rounded-md h-full flex flex-col justify-center items-center shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-lg sm:text-xl font-semibold mb-1">{gridMessageTitle}</p>
-                    <p className="text-xs sm:text-sm">{gridMessageDetails}</p>
-                  </div>
-                )
-              )}
-              {activeMainView === 'smartScheduler' && (
-                <SmartSchedulerView />
-              )}
-              {activeMainView === 'attendanceLog' && (
-                <AttendanceLogView
-                  logData={attendanceLog}
-                  onClose={() => handleMainViewChange('routine')}
-                  onEditEntry={handleOpenEditAttendanceLog}
-                  onDeleteEntry={handleDeleteAttendanceLogEntry}
-                  onClearAll={handleClearAttendanceLog}
-                  onToggleMakeupStatus={handleToggleMakeupStatus}
-                  allRooms={allRooms}
-                  getBuildingName={getBuildingNameFromApp}
-                  getProgramShortName={getProgramShortNameFromApp}
-                />
-              )}
-               {activeMainView === 'sectionList' && (
-                <FullSectionListView
-                  user={user}
-                  coursesData={coursesForSectionListView}
-                  allPrograms={allPrograms}
-                  onClose={() => handleMainViewChange('routine')}
-                  setCoursesData={setCoursesData}
-                  routineData={activeRoutinesBySemester}
-                  allSemesterConfigurations={allSemesterConfigurations}
-                  initialFilters={initialSectionListFilters}
-                  onFiltersApplied={() => {}}
-                  stagedCourseUpdates={stagedCourseUpdates}
-                  ciwCounts={ciwCounts}
-                  classRequirementCounts={classRequirementCounts}
-                  dashboardTabFilter={dashboardTabFilter}
-                  allRooms={allRooms}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  onSlotClick={handleOpenSlotDetailModal}
-                />
-              )}
-              {activeMainView === 'courseList' && (
-                <CourseMasterView
-                  user={user}
-                  coursesData={coursesForCourseListView}
-                  allPrograms={allPrograms}
-                  ciwCounts={ciwCounts}
-                  classRequirementCounts={classRequirementCounts}
-                  onClose={() => handleMainViewChange('routine')}
-                  setCoursesData={setCoursesData}
-                  onUpdateLevelTerm={handleUpdateCourseLevelTerm}
-                  onUpdateWeeklyClass={handleUpdateWeeklyClass}
-                  onUpdateCourseType={handleUpdateCourseType}
-                />
-              )}
-               {activeMainView === 'roomList' && (
-                <RoomMasterView
-                  user={user}
-                  rooms={roomsForRoomListView}
-                  onClose={() => handleMainViewChange('routine')}
-                  getBuildingName={getBuildingNameFromApp}
-                  getFloorName={getFloorNameFromApp}
-                  getProgramShortName={getProgramShortNameFromApp}
-                  getTypeName={getTypeNameFromApp}
-                  getOccupancyStats={getOccupancyStats}
-                  allBuildings={allBuildings}
-                  allFloors={allFloors}
-                  onRoomClick={handleOpenRoomDetailModalWithPermissionCheck}
-                  allPrograms={allPrograms}
-                  allCategories={allCategories}
-                  allRoomTypes={allRoomTypes}
-                  uniqueSemesters={uniqueSemestersForRooms}
-                  routineData={activeRoutinesBySemester}
-                />
-              )}
-              {activeMainView === 'teacherList' && (
-                <TeacherMasterView
-                  teachers={teachersForTeacherListView}
-                  allPrograms={allPrograms}
-                  onClose={() => handleMainViewChange('routine')}
-                  ciwCounts={ciwCounts}
-                  classRequirementCounts={classRequirementCounts}
-                  getProgramShortName={getProgramShortNameFromApp}
-                  fullRoutineData={activeRoutinesBySemester}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-                  coursesData={coursesData}
-                  onMergeSections={handleMergeSections}
-                  onUnmergeSection={handleUnmergeSection}
-                />
-              )}
-              {activeMainView === 'buildingRooms' && (
-                <BuildingRoomsView
-                  user={user}
-                  buildingId={selectedBuildingIdForView}
-                  uniqueSemesters={uniqueSemestersForRooms}
-                  routineData={activeRoutinesBySemester}
-                  onClose={() => {
-                      handleMainViewChange('routine');
-                      setActiveSettingsSection(null);
-                  }}
-                  selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-                  setSelectedSemesterIdForRoutineView={setSelectedSemesterIdForRoutineView}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  allPrograms={allPrograms}
-                  allRoomTypes={allRoomTypes}
-                  scheduleOverrides={scheduleOverrides}
-                  allSemesterConfigurations={allSemesterConfigurations}
-                />
-              )}
-              {activeMainView === 'programDetail' && selectedProgramIdForDetailView && (
-                <ProgramDetailView 
-                  programId={selectedProgramIdForDetailView} 
-                  onClose={handleCloseProgramDetail}
-                  coursesData={coursesData}
-                  fullRoutineData={activeRoutinesBySemester}
-                  rooms={allRooms}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  allSemesterConfigurations={allSemesterConfigurations}
-                  allPrograms={allPrograms}
-                  allRoomTypes={allRoomTypes}
-                  activeGridDisplayType={activeGridDisplayType}
-                  selectedSemesterId={selectedSemesterIdForRoutineView}
-                />
-              )}
-              {activeMainView === 'semesterDetail' && activeSemesterDetailViewId && (
-                <SemesterDetailView 
-                  user={user}
-                  semesterId={activeSemesterDetailViewId} 
-                  onClose={handleCloseSemesterDetail}
-                  coursesData={coursesData}
-                  fullRoutineData={activeRoutinesBySemester}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  allPrograms={allPrograms}
-                  allBuildings={allBuildings}
-                  allFloors={allFloors}
-                  allRoomTypes={allRoomTypes}
-                  scheduleOverrides={scheduleOverrides}
-                  allSemesterConfigurations={allSemesterConfigurations}
-                  onUpdateLevelTerm={handleUpdateCourseLevelTerm}
-                  onUpdateWeeklyClass={handleUpdateWeeklyClass}
-                  onUpdateCourseType={handleUpdateCourseType}
-                  setCoursesData={setCoursesData}
-                  stagedCourseUpdates={stagedCourseUpdates}
-                  uniqueSemesters={uniqueSemestersForRooms}
-                  selectedProgramId={programIdForSemesterFilter}
-                  activeTab={activeGridDisplayType}
-                  getBuildingName={getBuildingNameFromApp}
-                  getFloorName={getFloorNameFromApp}
-                  getTypeName={getTypeNameFromApp}
-                  getProgramShortName={getProgramShortNameFromApp}
-                  allRooms={allRooms}
-                  onSlotClick={handleOpenSlotDetailModal}
-                />
-              )}
-              {activeMainView === 'userDetail' && selectedUserIdForDetailView && (
-                <UserDetailView 
-                  userId={selectedUserIdForDetailView} 
-                  allPrograms={allPrograms} 
-                  coursesData={coursesData}
-                  onClose={() => handleMainViewChange('routine')}
-                  onChangePassword={handleChangePassword}
-                  fullRoutineData={activeRoutinesBySemester}
-                  systemDefaultSlots={systemDefaultTimeSlots}
-                  selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-                  ciwCounts={ciwCounts}
-                  classRequirementCounts={classRequirementCounts}
-                  getProgramShortName={getProgramShortNameFromApp}
-                  allUsers={users}
-                  onMergeSections={handleMergeSections}
-                  onUnmergeSection={handleUnmergeSection}
-                />
-              )}
-            </Suspense>
-
-            {isDayTimeSlotDetailModalOpen && selectedDayForDayCentricModal && selectedSlotObjectForDayCentricModal && (
-              <>
-                <div 
-                  className="absolute inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300 ease-out"
-                  onClick={handleCloseDayTimeSlotDetailModal}
-                  aria-hidden="true"
-                ></div>
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-                  <DayTimeSlotDetailModal
-                      isOpen={isDayTimeSlotDetailModalOpen} 
-                      onClose={handleCloseDayTimeSlotDetailModal}
-                      day={selectedDayForDayCentricModal}
-                      selectedSlotObject={selectedSlotObjectForDayCentricModal}
-                      systemDefaultSlots={systemDefaultTimeSlots}
-                      fullRoutineData={routineDataForGrid}
-                      roomEntries={effectiveRoomEntriesForGrid}
-                      onRoomNameClick={(room) => {
-                        handleOpenRoomDetailModalWithPermissionCheck(room); 
-                      }}
-                      getProgramShortName={getProgramShortNameFromApp}
-                      activeProgramIdInSidebar={activeProgramIdInSidebar}
-                      scheduleOverrides={scheduleOverrides}
-                      selectedDate={selectedDate}
-                      allSemesterConfigurations={allSemesterConfigurations}
-                      allPrograms={allPrograms}
-                  />
-                </div>
-              </>
-            )}
-
-            {isSlotDetailModalOpen && selectedSlotData && (
-              <>
-                <div 
-                  className="absolute inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300 ease-out"
-                  onClick={handleCloseSlotDetailModal}
-                  aria-hidden="true"
-                ></div>
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-                    <SlotDetailModal
-                        isOpen={isSlotDetailModalOpen}
-                        onClose={handleCloseSlotDetailModal}
-                        slotData={selectedSlotData}
-                        getBuildingName={getBuildingNameFromApp}
-                        getProgramDisplayString={getProgramDisplayString}
-                        fullRoutineData={activeRoutinesBySemester}
-                        allSemesterConfigurations={allSemesterConfigurations}
-                        allPrograms={allPrograms}
-                        coursesData={coursesData}
-                        scheduleOverrides={scheduleOverrides}
-                        scheduleHistory={scheduleHistory}
-                        onUpdateOverrides={handleUpdateScheduleOverrides}
-                        onUpdateDefaultRoutine={handleUpdateDefaultRoutine}
-                        activeProgramIdInSidebar={activeProgramIdInSidebar}
-                        selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
-                        pendingChanges={pendingChanges}
-                        setPendingChanges={setPendingChanges}
-                        isEditable={isEditable}
-                    />
-                </div>
-              </>
-            )}
-        </main>
-      </div>
-
-      {isLogAttendanceModalOpen && logDataForModal && (
-        <LogAttendanceModal
-            isOpen={isLogAttendanceModalOpen}
-            onClose={handleCloseLogAttendanceModal}
-            logDataTemplate={logDataForModal}
-            onSubmit={handleSaveAttendanceLog}
-            allRooms={allRooms}
-            systemDefaultTimeSlots={systemDefaultTimeSlots}
-            routineData={activeRoutinesBySemester}
-            scheduleOverrides={scheduleOverrides}
-            allPrograms={allPrograms}
-            allRoomTypes={allRoomTypes}
-            getBuildingName={getBuildingNameFromApp}
-        />
-      )}
-
-      {isOverlayAnimating && activeOverlay && ( 
-        <div
-          key={activeOverlay} 
-          className={`
-            fixed left-0 bg-white shadow-2xl z-30 
-            transform transition-all duration-300 ease-in-out overflow-hidden
-            ${SHARED_SIDE_PANEL_WIDTH_CLASSES}
-            ${applyOpenAnimationStyles ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12 pointer-events-none'}
-          `}
-          style={{ 
-            top: headerHeight, 
-            bottom: `${SIDEBAR_FOOTER_HEIGHT_PX}px`
-          }} 
-          aria-hidden={!activeOverlay}
-        >
-          <Suspense fallback={<LoadingSpinner />}>
-            {panelContent && ( 
-              <div
-                key={`${activeOverlay}-content`}
-                className={`
-                  h-full w-full transition-all duration-300 ease-in-out
-                  ${applyOpenAnimationStyles ? 'opacity-100 translate-y-0 delay-[50ms]' : 'opacity-0 translate-y-4 pointer-events-none'}
-                `}
-              >
-                {panelContent}
-              </div>
-            )}
-          </Suspense>
-        </div>
-      )}
-      
-      {selectedRoomForGridModal && (
-        <RoomDetailModal
-          room={selectedRoomForGridModal}
-          isOpen={isRoomDetailModalOpenFromGrid}
-          onClose={handleCloseRoomDetailModalFromGrid}
-          onSaveRoom={handleSaveRoomFromModal} 
-          allPrograms={allPrograms}
-          allBuildings={allBuildings}
-          allFloorsForBuilding={floorsForGridModal} 
-          allCategories={allCategories}
-          allRoomTypes={allRoomTypes}
-          onAddFloor={addFloorFromApp}
-          onAddCategory={addCategoryFromApp}
-          onAddRoomType={addTypeFromApp}
-          getBuildingName={getBuildingNameFromApp}
-          getBuildingAddress={getBuildingAddressFromApp}
-          getFloorName={getFloorNameFromApp}
-          getCategoryName={getCategoryNameFromApp}
-          getTypeName={getTypeNameFromApp}
-          getProgramShortName={getProgramShortNameFromApp}
-          fullRoutineData={activeRoutinesBySemester} 
-          systemDefaultSlots={systemDefaultTimeSlots} 
-          uniqueSemesters={uniqueSemestersForRooms}
-          scheduleOverrides={scheduleOverrides}
-          allSemesterConfigurations={allSemesterConfigurations}
-          zIndex={60}
-          heightClass="min-h-[75vh] max-h-[85vh]"
-        />
-      )}
-      
-      {isConflictModalOpen && conflictDataForModal && (
-        <ConflictResolutionModal
-          isOpen={isConflictModalOpen}
-          onClose={handleCloseConflictModal}
-          conflictInfo={conflictDataForModal}
-          onApplyResolution={handleApplyAiResolution}
-          allRooms={allRooms}
-          systemDefaultSlots={systemDefaultTimeSlots}
-          allPrograms={allPrograms}
-          coursesData={coursesData}
-          fullRoutineForDay={routineDataForGrid[conflictDataForModal.day] || {}}
-          semesterId={selectedSemesterIdForRoutineView}
-        />
-      )}
-
-      {isPublishConfirmModalOpen && (
-        <Modal
-            isOpen={isPublishConfirmModalOpen}
-            onClose={handleClosePublishConfirmModal}
-            title={`Publish for ${allPrograms.find(p => p.id === activeProgramIdInSidebar)?.shortName}`}
-            subTitle={`This will update the published routine for semester: ${selectedSemesterIdForRoutineView}`}
-            footerContent={
-                <div className="flex justify-end gap-2">
-                    <button onClick={handleClosePublishConfirmModal} className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md">
-                        Cancel
-                    </button>
-                    <button 
-                        onClick={handleConfirmPublish} 
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        disabled={!hasChangesToPublish}
-                    >
-                        Yes, Publish
-                    </button>
-                </div>
-            }
-            maxWidthClass="max-w-md"
-        >
-            <div className="p-4 text-sm text-gray-600 space-y-4">
-                <div>
-                    <p>
-                        Are you sure you want to publish the current <span className="font-semibold text-gray-800">draft</span> routine for the selected program?
-                    </p>
-                    {!hasChangesToPublish && (
-                        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800 text-center">
-                            <p className="font-semibold">No changes detected for this program's routine. Publishing is not necessary.</p>
-                        </div>
-                    )}
-                </div>
-
-                <div className="border-t pt-4">
-                    <h4 className="font-semibold text-gray-800 mb-2">Recent Publish History (Last 5)</h4>
-                    {publishHistoryForModal.length > 0 ? (
-                        <ul className="space-y-2 text-xs">
-                            {publishHistoryForModal.map((entry, index) => (
-                                <li key={index} className="p-2 bg-gray-100 rounded-md border border-gray-200">
-                                    <p>
-                                        Published by <span className="font-semibold text-teal-700">{entry.userName}</span> for program <span className="font-semibold text-teal-700">{getProgramShortNameFromApp(entry.programPId)}</span>
-                                    </p>
-                                    <p className="text-gray-500 text-right text-[10px] mt-1">
-                                        {new Date(entry.timestamp).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-                                    </p>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-xs text-gray-500 italic text-center py-2">No publish history for this semester yet.</p>
-                    )}
-                </div>
-            </div>
-        </Modal>
-      )}
-    </div>
-  );
-};
-
-const AppWrapper: React.FC = () => {
-    const { user } = useAuth();
-    if (!user) {
-        return <LoginScreen />;
-    }
-    return <AppContent />;
-}
-
-const App: React.FC = () => {
-  return (
-    <ProgramProvider>
-      <BuildingProvider>
-        <FloorProvider>
-          <RoomCategoryProvider>
-            <RoomTypeProvider>
-              <RoomProvider>
-                <AppWrapper />
-              </RoomProvider>
-            </RoomTypeProvider>
-          </RoomCategoryProvider>
-        </FloorProvider>
-      </BuildingProvider>
-    </ProgramProvider>
-  );
-};
-
-export default App;

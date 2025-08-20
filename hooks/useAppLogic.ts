@@ -816,6 +816,16 @@ export const useAppLogic = () => {
     ) => {
         if (!semesterId || !user) return;
 
+        if (user.role !== 'admin') {
+            const programPId = sourceClassInfo.pId;
+            const userHasAccess = user.accessibleProgramPIds?.includes(programPId!);
+
+            if (!programPId || !userHasAccess) {
+                alert("You do not have permission to move classes for this program.");
+                return;
+            }
+        }
+
         const sourceRoom = allRooms.find(r => r.roomNumber === source.roomNumber && r.semesterId === semesterId);
         const targetRoom = allRooms.find(r => r.roomNumber === target.roomNumber && r.semesterId === semesterId);
 
@@ -1565,6 +1575,10 @@ export const useAppLogic = () => {
         handleCloseConflictModal();
     }, [routineData, selectedSemesterIdForRoutineView, handleMoveRoutineEntry, handleCloseConflictModal]);
     
+    const handleCancelPendingChange = useCallback((changeId: string) => {
+      setPendingChanges(prev => prev.filter(c => c.id !== changeId));
+    }, []);
+    
     // --- Memoized Derived Data for Views ---
     const coursesForCourseListView = useMemo(() => {
         let filtered = coursesData;
@@ -1939,6 +1953,7 @@ export const useAppLogic = () => {
         handleOpenConflictModal,
         handleCloseConflictModal,
         handleApplyAiResolution,
+        handleCancelPendingChange,
         systemDefaultTimeSlots,
         uniqueSemestersForRooms,
         uniqueSemestersFromCourses,

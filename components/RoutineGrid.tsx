@@ -32,14 +32,37 @@ interface ClassCellProps {
   onConflictClick?: () => void;
 }
 
-const PendingCell: React.FC<{ change: PendingChange }> = React.memo(({ change }) => {
-    const { requestedClassInfo, requesterName } = change;
+interface PendingCellProps {
+  change: PendingChange;
+  onCancel: (changeId: string) => void;
+  canCancel: boolean;
+}
+
+const PendingCell: React.FC<PendingCellProps> = React.memo(({ change, onCancel, canCancel }) => {
+    const { requestedClassInfo, requesterName, id } = change;
+
+    const handleCancelClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent the cell's onClick from firing
+        onCancel(id);
+    };
     
     return (
         <div 
-            className="h-full rounded-md shadow-lg flex flex-col justify-center items-center text-center overflow-hidden p-1 bg-gray-100 pending-cell-bg"
+            className="relative group h-full rounded-md shadow-lg flex flex-col justify-center items-center text-center overflow-hidden p-1 bg-gray-100 pending-cell-bg"
             title={`Pending change requested by ${requesterName}`}
         >
+            {canCancel && (
+                <button
+                    onClick={handleCancelClick}
+                    title="Cancel this pending request"
+                    className="absolute top-0.5 right-0.5 z-10 p-0.5 bg-red-100/80 backdrop-blur-sm rounded-full text-red-700 hover:bg-red-200 hover:text-red-900 focus:outline-none focus:ring-1 focus:ring-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Cancel pending request"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                </button>
+            )}
             <div className="font-semibold text-gray-800 text-xs md:text-sm leading-tight">
                 Pending...
             </div>
@@ -255,6 +278,7 @@ interface RoutineGridProps {
   pendingChanges: PendingChange[];
   allSemesterConfigurations: SemesterCloneInfo[];
   allPrograms: ProgramEntry[];
+  allRooms: RoomEntry[];
   selectedDate: string | null;
   coursesData: EnrollmentEntry[];
   selectedSemesterIdForRoutineView: string | null;
@@ -271,6 +295,7 @@ interface RoutineGridProps {
     target: { day: DayOfWeek; roomNumber: string; slotString: string },
     semesterId: string
   ) => void;
+  onCancelPendingChange: (changeId: string) => void;
   selectedLevelTermFilter: string | null;
   selectedSectionFilter: string | null;
   selectedTeacherIdFilter: string | null;
@@ -346,6 +371,7 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
     scheduleOverrides,
     allSemesterConfigurations,
     allPrograms,
+    allRooms,
     selectedDate,
     coursesData,
     selectedSemesterIdForRoutineView,
@@ -353,6 +379,7 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
     activeDays,
     onMoveRoutineEntry,
     onAssignSectionToSlot,
+    onCancelPendingChange,
     selectedLevelTermFilter,
     selectedSectionFilter,
     selectedTeacherIdFilter,
@@ -600,6 +627,33 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
                 p.slotString === programSlotString &&
                 (p.isBulkUpdate ? p.day === selectedDayForRoomCentricView : (selectedDate ? p.dates?.includes(selectedDate) : false))
             );
+
+            const canCancelRequest = (() => {
+                if (!user || !pendingChangeForThisCell) return false;
+                
+                // User can cancel their own request
+                if (user.id === pendingChangeForThisCell.requesterId) return true;
+                
+                // Admin can cancel any request
+                if (user.role === 'admin') return true;
+                
+                // User with approval rights for the relevant program can cancel
+                if (user.notificationAccess?.canApproveSlots) {
+                    const roomForChange = allRooms.find(r => 
+                        r.roomNumber === pendingChangeForThisCell!.roomNumber && 
+                        r.semesterId === pendingChangeForThisCell!.semesterId
+                    );
+                    if (roomForChange?.assignedToPId && (user.accessibleProgramPIds || []).includes(roomForChange.assignedToPId)) {
+                        return true;
+                    }
+                     // If the room is unassigned, a general approver can cancel
+                    if (!roomForChange?.assignedToPId) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            })();
             
             let finalClassInfo: ClassDetail | undefined | null = undefined;
             let isMakeupClass = false;
@@ -672,7 +726,9 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
                 }
             }
             
-            const isDraggable = isEditable && !!finalClassInfo && !isMakeupClass && (user?.dashboardAccess?.canDragAndDrop === true);
+            const isDraggable = isEditable && !!finalClassInfo && !isMakeupClass && (user?.dashboardAccess?.canDragAndDrop === true) && (
+                user?.role === 'admin' || (!!finalClassInfo.pId && (user?.accessibleProgramPIds?.includes(finalClassInfo.pId) ?? false))
+            );
             const isDropTarget = isEditable && !isInactiveSlot && !pendingChangeForThisCell;
             const isCellClickable = !isInactiveSlot;
             
@@ -783,7 +839,11 @@ const RoutineGrid: React.FC<RoutineGridProps> = React.memo((props) => {
                 onDrop={(e) => handleDrop(e, room, headerSlotObj, isInactiveSlot)}
               >
                 {pendingChangeForThisCell ? (
-                    <PendingCell change={pendingChangeForThisCell} />
+                    <PendingCell
+                        change={pendingChangeForThisCell}
+                        onCancel={onCancelPendingChange}
+                        canCancel={canCancelRequest}
+                    />
                 ) : (
                     <ClassCell 
                         classInfo={finalClassInfo} 
