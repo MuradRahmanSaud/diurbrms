@@ -86,8 +86,23 @@ const PendingChangeCard = React.memo(({
     onOpenSelectiveApprovalModal: (change: PendingChange) => void;
 }) => {
     const isAssign = !!change.requestedClassInfo;
-    const actionColor = isAssign ? 'text-green-700' : 'text-red-700';
-    const actionBg = isAssign ? 'bg-green-100/70' : 'bg-red-100/70';
+    const isMove = !!change.source;
+
+    const actionColor = isMove ? 'text-purple-700' : (isAssign ? 'text-green-700' : 'text-red-700');
+    const actionBg = isMove ? 'bg-purple-100/70' : (isAssign ? 'bg-green-100/70' : 'bg-red-100/70');
+    const borderColorClass = isMove ? 'border-purple-500' : (isAssign ? 'border-green-500' : 'border-red-500');
+
+    const getActionTitle = () => {
+        if (isMove && change.requestedClassInfo) return `MOVE: ${change.requestedClassInfo.courseCode} (${change.requestedClassInfo.section})`;
+        if (isAssign) return `ASSIGN: ${change.requestedClassInfo!.courseCode} (${change.requestedClassInfo!.section})`;
+        return 'REQUEST: CLEAR SLOT';
+    };
+
+    const getActionDescription = () => {
+        if (isMove) return `Teacher: ${change.requestedClassInfo!.teacher}`;
+        if (isAssign) return `Teacher: ${change.requestedClassInfo!.teacher}`;
+        return 'Mark this slot as free.';
+    };
     
     const handleApproveClick = () => {
         if (!change.isBulkUpdate && change.dates && change.dates.length > 1) {
@@ -109,19 +124,36 @@ const PendingChangeCard = React.memo(({
             </div>
 
             {/* Request Details */}
-            <div className={`p-2 rounded-md ${actionBg} border-l-4 ${isAssign ? 'border-green-500' : 'border-red-500'}`}>
-                <p className={`font-bold text-sm ${actionColor} truncate`} title={isAssign ? `Assign: ${change.requestedClassInfo.courseCode} (${change.requestedClassInfo.section})` : 'Request: Clear Slot'}>
-                    {isAssign ? `ASSIGN: ${change.requestedClassInfo.courseCode} (${change.requestedClassInfo.section})` : 'REQUEST: CLEAR SLOT'}
+            <div className={`p-2 rounded-md ${actionBg} border-l-4 ${borderColorClass}`}>
+                <p className={`font-bold text-sm ${actionColor} truncate`} title={getActionTitle()}>
+                    {getActionTitle()}
                 </p>
-                <p className="text-xs text-gray-600 mt-0.5 truncate" title={isAssign ? `Teacher: ${change.requestedClassInfo.teacher}` : 'Mark this slot as free.'}>{isAssign ? `Teacher: ${change.requestedClassInfo.teacher}` : 'Mark this slot as free.'}</p>
+                <p className="text-xs text-gray-600 mt-0.5 truncate" title={getActionDescription()}>{getActionDescription()}</p>
             </div>
 
             {/* Context & Badge */}
             <div className="flex justify-between items-end">
-                <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 min-w-0">
-                    <div className="flex items-center gap-1.5 truncate" title={`${change.roomNumber} at ${change.slotString}`}><svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" /></svg><span className="font-semibold text-gray-800 whitespace-nowrap">{change.roomNumber}</span> at <span className="truncate">{change.slotString}</span></div>
-                    <div className="flex items-center gap-1.5" title={change.isBulkUpdate ? "Day of Week" : "Specific Date(s)"}><svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg><span className="font-semibold text-gray-800 truncate">{change.isBulkUpdate ? change.day : (change.dates || []).map(d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { day: 'numeric', month: 'short' })).join(', ')}</span></div>
-                </div>
+                {isMove && change.source ? (
+                    <div className="text-xs text-gray-600 space-y-1">
+                        <div className="flex items-center gap-1.5" title={`From ${change.source.roomNumber} at ${change.source.slotString} on ${change.source.day}`}>
+                            <span className="font-semibold text-gray-500 w-10">FROM:</span>
+                            <span className="font-semibold text-gray-800">{change.source.roomNumber}</span>
+                            <span className="truncate">{change.source.slotString}</span>
+                            <span>({change.source.day.substring(0,3)})</span>
+                        </div>
+                         <div className="flex items-center gap-1.5" title={`To ${change.roomNumber} at ${change.slotString} on ${change.day}`}>
+                            <span className="font-semibold text-gray-500 w-10">TO:</span>
+                            <span className="font-semibold text-gray-800">{change.roomNumber}</span>
+                            <span className="truncate">{change.slotString}</span>
+                            <span>({change.day.substring(0,3)})</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-1 text-xs text-gray-600 min-w-0">
+                        <div className="flex items-center gap-1.5 truncate" title={`${change.roomNumber} at ${change.slotString}`}><svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" /></svg><span className="font-semibold text-gray-800 whitespace-nowrap">{change.roomNumber}</span> at <span className="truncate">{change.slotString}</span></div>
+                        <div className="flex items-center gap-1.5" title={change.isBulkUpdate ? "Day of Week" : "Specific Date(s)"}><svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" /></svg><span className="font-semibold text-gray-800 truncate">{change.isBulkUpdate ? change.day : (change.dates || []).map(d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { day: 'numeric', month: 'short' })).join(', ')}</span></div>
+                    </div>
+                )}
                 <div className="flex flex-col items-end gap-1.5">
                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${change.isBulkUpdate ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                         {change.isBulkUpdate ? 'DEFAULT' : `MAKE-UP (${(change.dates || []).length})`}

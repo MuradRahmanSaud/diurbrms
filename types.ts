@@ -349,13 +349,20 @@ export interface PendingChange {
   requesterName: string;
   timestamp: string; // ISO string
   
-  // For 'ASSIGN', this is the new class. For 'CLEAR', this is null.
+  // For 'ASSIGN' or 'MOVE', this is the class info. For 'CLEAR', this is null.
   requestedClassInfo: ClassDetail | null; 
   
-  // Context
+  // Target context
   semesterId: string;
   roomNumber: string;
   slotString: string;
+
+  // Source context (ONLY for MOVE operations)
+  source?: {
+    roomNumber: string;
+    slotString: string;
+    day: DayOfWeek;
+  };
   
   // Scope
   isBulkUpdate: boolean; // true for default routine, false for overrides

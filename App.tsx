@@ -466,21 +466,17 @@ const AppContent: React.FC = () => {
     const change = pendingChanges.find(c => c.id === changeId);
     if (!change) return;
 
-    const { isBulkUpdate, dates, requestedClassInfo, day, roomNumber, slotString, semesterId } = change;
+    const { isBulkUpdate, dates, requestedClassInfo, day, roomNumber, slotString, semesterId, source } = change;
 
     // --- Logic for partial or full approval of multi-date requests ---
     if (!isBulkUpdate && dates) {
-        const approvedDates = datesToApprove || dates; // If no specific dates passed, approve all
-        
+        const approvedDates = datesToApprove || dates;
         const approvedAssignments = approvedDates.reduce((acc, dateISO) => {
             acc[dateISO] = requestedClassInfo;
             return acc;
         }, {} as Record<string, ClassDetail | null>);
-        
         handleUpdateScheduleOverrides(roomNumber, slotString, approvedAssignments, undefined);
-
         const remainingDates = dates.filter(d => !approvedDates.includes(d));
-
         if (remainingDates.length > 0) {
             const updatedChange: PendingChange = { ...change, dates: remainingDates };
             setPendingChanges(prev => prev.map(c => (c.id === changeId ? updatedChange : c)));
@@ -488,17 +484,29 @@ const AppContent: React.FC = () => {
             setPendingChanges(prev => prev.filter(c => c.id !== changeId));
         }
     } else if (isBulkUpdate) {
-        // --- Original logic for full approval (bulk update) ---
-        handleUpdateDefaultRoutine(day, roomNumber, slotString, requestedClassInfo, semesterId);
+        // --- Logic for bulk updates (Default Routine) ---
+        if (source) { // This is a 'MOVE' operation
+            // 1. Clear the source slot
+            handleUpdateDefaultRoutine(source.day, source.roomNumber, source.slotString, null, semesterId);
+            // 2. Assign to the target slot
+            handleUpdateDefaultRoutine(day, roomNumber, slotString, requestedClassInfo, semesterId);
+        } else { // This is a simple 'ASSIGN' or 'CLEAR'
+            handleUpdateDefaultRoutine(day, roomNumber, slotString, requestedClassInfo, semesterId);
+        }
         setPendingChanges(prev => prev.filter(c => c.id !== changeId));
     }
 
     // --- Notification Logic ---
-    const actionText = requestedClassInfo
-      ? `assign ${requestedClassInfo.courseCode} (${requestedClassInfo.section})`
-      : 'clear the slot';
+    let actionText = '';
+    if (source && requestedClassInfo) {
+      actionText = `move ${requestedClassInfo.courseCode} (${requestedClassInfo.section}) from ${source.roomNumber} to ${roomNumber}`;
+    } else if (requestedClassInfo) {
+      actionText = `assign ${requestedClassInfo.courseCode} (${requestedClassInfo.section}) to Room ${roomNumber}`;
+    } else {
+      actionText = `clear the slot in Room ${roomNumber}`;
+    }
 
-    let message = `Your request to ${actionText} for Room ${roomNumber} at ${slotString}`;
+    let message = `Your request to ${actionText} at ${slotString}`;
 
     if (isBulkUpdate) {
       message += ` on ${day}s has been approved.`;
@@ -534,13 +542,22 @@ const AppContent: React.FC = () => {
       const change = pendingChanges.find(c => c.id === changeId);
       if (!change) return;
 
+      let actionText;
+      if (change.source && change.requestedClassInfo) {
+          actionText = `move ${change.requestedClassInfo.courseCode} from ${change.source.roomNumber} to ${change.roomNumber}`;
+      } else if (change.requestedClassInfo) {
+          actionText = `assign ${change.requestedClassInfo.courseCode} to Room ${change.roomNumber}`;
+      } else {
+          actionText = `clear a slot in Room ${change.roomNumber}`;
+      }
+
       const newNotification: Notification = {
           id: `notif-reject-${Date.now()}`,
           timestamp: new Date().toISOString(),
           userId: change.requesterId,
           type: 'rejection',
           title: 'Request Rejected',
-          message: `Your request for Room ${change.roomNumber} on ${change.isBulkUpdate ? change.day : (change.dates || []).join(', ')} has been rejected.`,
+          message: `Your request to ${actionText} on ${change.isBulkUpdate ? change.day : (change.dates || []).join(', ')} has been rejected.`,
           isRead: false,
           relatedChangeId: changeId,
       };
@@ -1161,6 +1178,7 @@ const AppContent: React.FC = () => {
                         activeProgramIdInSidebar={activeProgramIdInSidebar}
                         selectedSemesterIdForRoutineView={selectedSemesterIdForRoutineView}
                         pendingChanges={pendingChanges}
+                        setPendingChanges={setPendingChanges}
                         isEditable={isEditable}
                     />
                 </div>

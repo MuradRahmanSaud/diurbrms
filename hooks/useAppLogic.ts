@@ -809,69 +809,99 @@ export const useAppLogic = () => {
     }, [pendingChanges]);
 
     const handleMoveRoutineEntry = useCallback((
-        source: { day: DayOfWeek; roomNumber: string; slotString: string },
-        target: { day: DayOfWeek; roomNumber: string; slotString: string },
-        sourceClassInfo: ClassDetail,
-        semesterId: string
+      source: { day: DayOfWeek; roomNumber: string; slotString: string },
+      target: { day: DayOfWeek; roomNumber: string; slotString: string },
+      sourceClassInfo: ClassDetail,
+      semesterId: string
     ) => {
         if (!semesterId || !user) return;
-    
+
+        const sourceRoom = allRooms.find(r => r.roomNumber === source.roomNumber && r.semesterId === semesterId);
+        const targetRoom = allRooms.find(r => r.roomNumber === target.roomNumber && r.semesterId === semesterId);
+
+        if (!sourceRoom || !targetRoom) {
+            alert("Error: Source or target room could not be found.");
+            return;
+        }
+
         const activeVersion = routineData[semesterId]?.versions.find(v => v.versionId === routineData[semesterId].activeVersionId);
         if (!activeVersion) return;
-    
         const targetClassInfo = activeVersion.routine[target.day]?.[target.roomNumber]?.[target.slotString] || null;
-    
-        const commonHistoryProps = {
-            timestamp: new Date().toISOString(),
-            userId: user.id, userName: user.name, userAvatar: user.avatar,
-            semesterId, isOverride: false,
-        };
-    
-        const newHistoryEntries: ScheduleLogEntry[] = [];
-    
-        if (targetClassInfo) { // SWAP
-            // Log source slot change
-            newHistoryEntries.push({ ...commonHistoryProps, logId: `log-move-${Date.now()}-1`, ...source, day: source.day, from: sourceClassInfo, to: targetClassInfo });
-            // Log target slot change
-            newHistoryEntries.push({ ...commonHistoryProps, logId: `log-move-${Date.now()}-2`, ...target, day: target.day, from: targetClassInfo, to: sourceClassInfo });
-        } else { // MOVE
-            // Log source slot becoming free
-            newHistoryEntries.push({ ...commonHistoryProps, logId: `log-move-${Date.now()}-1`, ...source, day: source.day, from: sourceClassInfo, to: null });
-            // Log target slot getting the class
-            newHistoryEntries.push({ ...commonHistoryProps, logId: `log-move-${Date.now()}-2`, ...target, day: target.day, from: null, to: sourceClassInfo });
-        }
-    
-        setScheduleHistory(prev => [...newHistoryEntries, ...prev]);
-    
-        setRoutineData(prevData => {
-            const newData = JSON.parse(JSON.stringify(prevData));
-            const semesterData = newData[semesterId];
-            if (!semesterData) return prevData;
-            
-            const currentActiveVersion = semesterData.versions.find(v => v.versionId === semesterData.activeVersionId);
-            if (!currentActiveVersion) return prevData;
 
-            const newRoutine = currentActiveVersion.routine;
-    
-            if (!newRoutine[target.day]) newRoutine[target.day] = {};
-            if (!newRoutine[target.day][target.roomNumber]) newRoutine[target.day][target.roomNumber] = {};
-            newRoutine[target.day][target.roomNumber][target.slotString] = sourceClassInfo;
-    
-            if (targetClassInfo) {
-                if (!newRoutine[source.day]) newRoutine[source.day] = {};
-                if (!newRoutine[source.day][source.roomNumber]) newRoutine[source.day][source.roomNumber] = {};
-                newRoutine[source.day][source.roomNumber][source.slotString] = targetClassInfo;
-            } else {
+        if (targetClassInfo) {
+            alert("Swapping classes via drag-and-drop requires direct permission for both slots. Please ensure the target slot is empty if you need to request approval.");
+            return;
+        }
+
+        const hasPermissionForRoom = (room: RoomEntry) => {
+            if (user.role === 'admin') return true;
+            const roomProgramPId = room.assignedToPId;
+            if (!roomProgramPId) {
+                return user.bulkAssignAccess !== 'none';
+            }
+            return user.notificationAccess?.canApproveSlots && (user.accessibleProgramPIds || []).includes(roomProgramPId);
+        };
+
+        const canDirectlyEditSource = hasPermissionForRoom(sourceRoom);
+        const canDirectlyEditTarget = hasPermissionForRoom(targetRoom);
+
+        if (canDirectlyEditSource && canDirectlyEditTarget) {
+            const commonHistoryProps = {
+                timestamp: new Date().toISOString(),
+                userId: user.id, userName: user.name, userAvatar: user.avatar,
+                semesterId, isOverride: false,
+            };
+            const newHistoryEntries: ScheduleLogEntry[] = [
+                { ...commonHistoryProps, logId: `log-move-${Date.now()}-1`, ...source, day: source.day, from: sourceClassInfo, to: null },
+                { ...commonHistoryProps, logId: `log-move-${Date.now()}-2`, ...target, day: target.day, from: null, to: sourceClassInfo }
+            ];
+            setScheduleHistory(prev => [...newHistoryEntries, ...prev]);
+
+            setRoutineData(prevData => {
+                const newData = JSON.parse(JSON.stringify(prevData));
+                const semesterData = newData[semesterId];
+                if (!semesterData) return prevData;
+                
+                const currentActiveVersion = semesterData.versions.find(v => v.versionId === semesterData.activeVersionId);
+                if (!currentActiveVersion) return prevData;
+
+                const newRoutine = currentActiveVersion.routine;
+                if (!newRoutine[target.day]) newRoutine[target.day] = {};
+                if (!newRoutine[target.day][target.roomNumber]) newRoutine[target.day][target.roomNumber] = {};
+                newRoutine[target.day][target.roomNumber][target.slotString] = sourceClassInfo;
+
                 if (newRoutine[source.day]?.[source.roomNumber]?.[source.slotString]) {
                     delete newRoutine[source.day][source.roomNumber][source.slotString];
                     if (Object.keys(newRoutine[source.day][source.roomNumber]).length === 0) delete newRoutine[source.day][source.roomNumber];
                     if (Object.keys(newRoutine[source.day]).length === 0) delete newRoutine[source.day];
                 }
-            }
-    
-            return newData;
-        });
-    }, [user, routineData]);
+                return newData;
+            });
+        } else {
+            const request: PendingChange = {
+                id: `pc-move-${Date.now()}`,
+                requesterId: user.id,
+                requesterName: user.name,
+                timestamp: new Date().toISOString(),
+                requestedClassInfo: sourceClassInfo, // The class being moved
+                semesterId: semesterId,
+                // Target props
+                roomNumber: target.roomNumber,
+                slotString: target.slotString,
+                day: target.day,
+                // Source props
+                source: {
+                    roomNumber: source.roomNumber,
+                    slotString: source.slotString,
+                    day: source.day,
+                },
+                isBulkUpdate: true, // This is a default routine change
+            };
+            
+            setPendingChanges(prev => [...prev, request]);
+            alert("Your request to move the class has been submitted for approval.");
+        }
+    }, [user, allRooms, routineData, setPendingChanges, setScheduleHistory]);
 
     const handleAssignSectionToSlot = useCallback((
         sectionId: string,

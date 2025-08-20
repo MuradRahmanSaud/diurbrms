@@ -25,6 +25,7 @@ interface SlotDetailModalProps {
   activeProgramIdInSidebar: string | null;
   selectedSemesterIdForRoutineView: string | null;
   pendingChanges: PendingChange[];
+  setPendingChanges: React.Dispatch<React.SetStateAction<PendingChange[]>>;
   isEditable: boolean;
 }
 
@@ -353,6 +354,7 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
   activeProgramIdInSidebar,
   selectedSemesterIdForRoutineView,
   pendingChanges,
+  setPendingChanges,
   isEditable,
 }) => {
     const { user } = useAuth();
@@ -392,6 +394,9 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
     }, [user]);
 
     const isAssignmentDisabled = useMemo(() => {
+        if (!isEditable) {
+            return { disabled: true, reason: "Viewing published routine. Switch to 'Draft' mode to make changes." };
+        }
         if (!selectedSemesterIdForRoutineView) {
             return { disabled: true, reason: "Please select a specific semester from the sidebar to assign courses." };
         }
@@ -399,7 +404,7 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
             return { disabled: true, reason: "You do not have permission to assign courses." };
         }
         return { disabled: false, reason: "" };
-    }, [canAssignCourses, selectedSemesterIdForRoutineView]);
+    }, [canAssignCourses, selectedSemesterIdForRoutineView, isEditable]);
 
     const weeklyDates = useMemo(() => {
         if (!isOpen) return []; // Don't compute if not open
@@ -665,37 +670,84 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
     }
   };
   
+  const hasDirectEditPermission = useMemo(() => {
+    if (!user || !room) return false;
+    if (user.role === 'admin') return true;
+
+    const roomProgramPId = room.assignedToPId;
+    if (!roomProgramPId) {
+        // If room is unassigned, anyone with makeup/bulk access can edit directly
+        return user.makeupSlotBookingAccess !== 'none' || user.bulkAssignAccess !== 'none';
+    }
+
+    return (
+        user.notificationAccess?.canApproveSlots &&
+        (user.accessibleProgramPIds || []).includes(roomProgramPId)
+    );
+  }, [user, room]);
+
   const handleSaveChanges = () => {
-    if (!room.semesterId) {
-      console.error("Cannot save changes without a semester ID on the room.");
-      return;
+    if (!room.semesterId || !user) {
+        console.error("Cannot save: Missing semesterId on room or user is not logged in.");
+        return;
     }
-    
-    let finalDateAssignments = { ...dateAssignments };
-    
-    if (stagedDefaultClass !== undefined) {
-        // A bulk assignment was staged.
-        // 1. Apply the new default class.
-        onUpdateDefaultRoutine(day, room.roomNumber, slotString, stagedDefaultClass, room.semesterId);
+  
+    if (hasDirectEditPermission) {
+        // Direct update logic
+        if (stagedDefaultClass !== undefined) {
+            onUpdateDefaultRoutine(day, room.roomNumber, slotString, stagedDefaultClass, room.semesterId);
+        }
+        onUpdateOverrides(room.roomNumber, slotString, dateAssignments, effectiveDefaultClassInfo);
+    } else {
+        // Request approval logic
+        if (assignmentMode === 'bulk' && stagedDefaultClass !== undefined) {
+            const newChange: PendingChange = {
+                id: `pc-${Date.now()}`,
+                requesterId: user.id,
+                requesterName: user.name,
+                timestamp: new Date().toISOString(),
+                requestedClassInfo: stagedDefaultClass,
+                semesterId: room.semesterId,
+                roomNumber: room.roomNumber,
+                slotString: slotString,
+                isBulkUpdate: true,
+                day: day,
+            };
+            setPendingChanges(prev => [...prev, newChange]);
+        }
+  
+        if (assignmentMode === 'specific' && Object.keys(dateAssignments).length > 0) {
+            const changesByClass = new Map<string, { classInfo: ClassDetail | null, dates: string[] }>();
+            
+            Object.entries(dateAssignments).forEach(([dateISO, classInfo]) => {
+                const classKey = JSON.stringify(classInfo);
+                if (!changesByClass.has(classKey)) {
+                    changesByClass.set(classKey, { classInfo, dates: [] });
+                }
+                changesByClass.get(classKey)!.dates.push(dateISO);
+            });
 
-        // 2. Explicitly overwrite any 'Free' (null) overrides with the new default.
-        // This allows onUpdateOverrides to later clean them up as redundant.
-        Object.keys(finalDateAssignments).forEach(dateISO => {
-            if (finalDateAssignments[dateISO] === null) {
-                finalDateAssignments[dateISO] = stagedDefaultClass;
-            }
-        });
-    }
+            const newChanges: PendingChange[] = Array.from(changesByClass.values()).map(data => ({
+                id: `pc-${Date.now()}-${Math.random()}`,
+                requesterId: user.id,
+                requesterName: user.name,
+                timestamp: new Date().toISOString(),
+                requestedClassInfo: data.classInfo,
+                semesterId: room.semesterId!,
+                roomNumber: room.roomNumber,
+                slotString: slotString,
+                isBulkUpdate: false,
+                day: day, // context for which day's overrides are being changed
+                dates: data.dates,
+            }));
 
-    // Now, call onUpdateOverrides to persist any changes to specific dates,
-    // and to allow it to clean up overrides that are now redundant with the new default.
-    // We call this if any changes at all were made to avoid missing a case.
-    if (hasMadeChanges) {
-      onUpdateOverrides(room.roomNumber, slotString, finalDateAssignments, effectiveDefaultClassInfo);
+            setPendingChanges(prev => [...prev, ...newChanges]);
+        }
+        alert('Your change request has been submitted for approval.');
     }
-    
     onClose();
   };
+  
   
   const relevantHistory = useMemo(() => {
     if (!isOpen) return [];
@@ -802,11 +854,20 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
                 disabled={isAssignmentDisabled.disabled || !hasMadeChanges}
                 className="px-4 py-2 bg-teal-600 text-white font-medium rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-                Save Changes
+                {hasDirectEditPermission ? 'Save Changes' : 'Submit for Approval'}
             </button>
         </div>
     </div>
 );
+  const pendingChangeForThisSlot = useMemo(() => {
+    return pendingChanges.find(p =>
+      p.semesterId === room.semesterId &&
+      p.roomNumber === room.roomNumber &&
+      p.slotString === slotString &&
+      p.day === day
+    );
+  }, [pendingChanges, room, slotString, day]);
+
 
   return (
     <div
@@ -832,7 +893,27 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
         </div>
         
         <div className="p-3 sm:p-4 flex-grow min-h-0 flex flex-col">
-          {activeTab === 'assignment' ? (
+          {pendingChangeForThisSlot ? (
+            <div className="flex-grow flex items-center justify-center text-center p-4 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-lg">
+                <div>
+                    <h3 className="text-lg font-bold text-yellow-800">Change Pending Approval</h3>
+                    <p className="mt-1 text-sm text-yellow-700">
+                        A change for this slot has been requested by <span className="font-semibold">{pendingChangeForThisSlot.requesterName}</span> and is awaiting approval.
+                    </p>
+                    <div className="mt-3 p-2 bg-white rounded-md text-xs">
+                        {pendingChangeForThisSlot.requestedClassInfo ? (
+                           <>
+                            <p><strong>Action:</strong> Assign</p>
+                            <p><strong>Course:</strong> {pendingChangeForThisSlot.requestedClassInfo.courseCode} ({pendingChangeForThisSlot.requestedClassInfo.section})</p>
+                           </>
+                        ) : (
+                             <p><strong>Action:</strong> Clear Slot</p>
+                        )}
+                         <p><strong>Scope:</strong> {pendingChangeForThisSlot.isBulkUpdate ? `Default for all ${pendingChangeForThisSlot.day}s` : `Specific dates: ${(pendingChangeForThisSlot.dates || []).join(', ')}`}</p>
+                    </div>
+                </div>
+            </div>
+          ) : activeTab === 'assignment' ? (
             <div className="flex flex-col md:grid md:grid-cols-5 lg:grid-cols-9 gap-4 lg:gap-6 flex-grow min-h-0">
                 {/* Center column: Course Assignment */}
                 <div className={`md:col-span-2 lg:col-span-4 flex-shrink-0 flex flex-col min-h-0 relative ${isAssignmentDisabled.disabled ? 'opacity-50' : ''}`}>
@@ -1026,7 +1107,7 @@ const SlotDetailModal: React.FC<SlotDetailModalProps> = React.memo(({
                     disabled={isAssignmentDisabled.disabled || !hasMadeChanges}
                     className="px-4 py-2 bg-teal-600 text-white font-medium rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                    Save Changes
+                    {hasDirectEditPermission ? 'Save Changes' : 'Submit for Approval'}
                 </button>
             </div>
         </div>
