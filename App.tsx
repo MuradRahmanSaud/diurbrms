@@ -94,7 +94,7 @@ const AppContent: React.FC = () => {
       stagedCourseUpdates, setStagedCourseUpdates, handleSaveCourseMetadata, handleClearStagedCourseUpdates,
       coursesData, setCoursesData, handleUpdateCourseLevelTerm, handleUpdateWeeklyClass, handleUpdateCourseType,
       allSemesterConfigurations, setAllSemesterConfigurations, handleCloneRooms,
-      routineData, setRoutineData, handleUpdateDefaultRoutine, handleMoveRoutineEntry,
+      routineData, setRoutineData, handleUpdateDefaultRoutine, 
       scheduleOverrides, handleUpdateScheduleOverrides,
       scheduleHistory,
       attendanceLog,
@@ -166,6 +166,56 @@ const AppContent: React.FC = () => {
       handleCloseProgramDetail, handleCloseSemesterDetail,
       selectedBuildingIdForView, selectedProgramIdForDetailView, activeSemesterDetailViewId, selectedUserIdForDetailView,
   } = useAppLogic();
+
+  const handleMoveRoutineEntry = useCallback((
+    source: { day: DayOfWeek; roomNumber: string; slotString: string },
+    target: { day: DayOfWeek; roomNumber: string; slotString: string },
+    classInfo: ClassDetail, // this is source class info
+    semesterId: string
+  ) => {
+    setRoutineData(prev => {
+        const newData = JSON.parse(JSON.stringify(prev));
+        const semesterData: SemesterRoutineData = newData[semesterId];
+        if (!semesterData?.activeVersionId) return prev;
+
+        const activeVersion = semesterData.versions.find((v: RoutineVersion) => v.versionId === semesterData.activeVersionId);
+        if (!activeVersion) return prev;
+        
+        const routine = activeVersion.routine;
+        
+        const targetClassInfo = routine[target.day]?.[target.roomNumber]?.[target.slotString] || null;
+
+        // Perform SWAP if target is occupied
+        if (targetClassInfo) {
+            // Set source class to target slot
+            if (!routine[target.day]) routine[target.day] = {};
+            if (!routine[target.day][target.roomNumber]) routine[target.day][target.roomNumber] = {};
+            routine[target.day][target.roomNumber][target.slotString] = classInfo;
+
+            // Set target class to source slot
+            if (!routine[source.day]) routine[source.day] = {};
+            if (!routine[source.day][source.roomNumber]) routine[source.day][source.roomNumber] = {};
+            routine[source.day][source.roomNumber][source.slotString] = targetClassInfo;
+        } 
+        // Perform MOVE if target is empty
+        else {
+            // Clear from source
+            if (routine[source.day]?.[source.roomNumber]?.[source.slotString]) {
+                delete routine[source.day][source.roomNumber][source.slotString];
+                if (Object.keys(routine[source.day][source.roomNumber]).length === 0) delete routine[source.day][source.roomNumber];
+                if (Object.keys(routine[source.day]).length === 0) delete routine[source.day];
+            }
+
+            // Set to target
+            if (!routine[target.day]) routine[target.day] = {};
+            if (!routine[target.day][target.roomNumber]) routine[target.day][target.roomNumber] = {};
+            routine[target.day][target.roomNumber][target.slotString] = classInfo;
+        }
+        
+        return newData;
+    });
+  }, [setRoutineData]);
+
 
   const {
       // Modal State
